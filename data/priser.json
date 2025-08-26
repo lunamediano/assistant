@@ -1,0 +1,19 @@
+{
+  "vhs_per_kassett": 390,
+  "smalfilm_per_minutt": 20,
+  "minnepenn_fastpris": 199,
+  "oppgradering_ai_per_time": 350,
+  "eksempler": [
+    {
+      "tittel": "3 VHS‑kassetter + minnepenn",
+      "pris": 1369,
+      "beskrivelse": "Digitalisering av 3 kassetter til MP4, levert på minnepenn."
+    },
+    {
+      "tittel": "50 min smalfilm + deling",
+      "pris": 1000,
+      "beskrivelse": "Skan av smalfilm, grunnleggende farge/kontrastjustering, fil levert for nedlasting."
+    }
+  ],
+  "forbehold": "Endelige priser avhenger av faktisk spilletid/tilstand. Be om tilbud for nøyaktig pris."
+}

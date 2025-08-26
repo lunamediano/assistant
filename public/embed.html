@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Luna – AI‑assistent</title>
+  <style>
+    .luna-launcher { position: fixed; bottom: 24px; right: 24px; background:#111; color:#fff; border-radius:999px; padding:12px 16px; font-family: system-ui, sans-serif; cursor:pointer; box-shadow:0 10px 25px rgba(0,0,0,.2); z-index: 99999; }
+    .luna-panel { position: fixed; bottom: 90px; right: 24px; width: 360px; max-height: 70vh; background:#fff; border-radius:16px; box-shadow:0 20px 40px rgba(0,0,0,.2); display:none; overflow:hidden; font-family: system-ui, sans-serif; z-index: 99999; }
+    .luna-header { padding:12px 16px; border-bottom:1px solid #eee; display:flex; align-items:center; gap:10px; }
+    .luna-header .dot { width:10px; height:10px; border-radius:50%; background:#0ea5e9; }
+    .luna-title { font-weight:600; }
+    .luna-body { padding:12px; display:flex; flex-direction:column; gap:8px; height: 52vh; overflow:auto; }
+    .luna-msg { padding:10px 12px; border-radius:12px; max-width:80%; line-height:1.35; font-size:14px; }
+    .luna-msg.user { align-self:flex-end; background:#0ea5e9; color:#fff; }
+    .luna-msg.bot { align-self:flex-start; background:#f3f4f6; color:#111; }
+    .luna-input { display:flex; gap:8px; padding:12px; border-top:1px solid #eee; }
+    .luna-input input { flex:1; padding:10px 12px; border:1px solid #ddd; border-radius:10px; font-size:14px; }
+    .luna-input button { padding:10px 14px; border-radius:10px; border:none; background:#111; color:#fff; cursor:pointer; }
+    @media (max-width: 480px){ .luna-panel{ right:12px; left:12px; width:auto; } }
+  </style>
+</head>
+<body>
+  <div class="luna-launcher" id="luna-launcher">💬 Snakk med Luna</div>
+  <div class="luna-panel" id="luna-panel" aria-live="polite">
+    <div class="luna-header">
+      <div class="dot"></div>
+      <div class="luna-title">Luna – din digitale assistent</div>
+    </div>
+    <div class="luna-body" id="luna-body"></div>
+    <div class="luna-input">
+      <input id="luna-input" placeholder="Spør om pris, kvalitet, levering…" />
+      <button id="luna-send">Send</button>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = "https://DIN-DEPLOYMENT.COM/api/assist"; // Bytt til din serverless-URL
+    const launcher = document.getElementById('luna-launcher');
+    const panel = document.getElementById('luna-panel');
+    const bodyEl = document.getElementById('luna-body');
+    const inputEl = document.getElementById('luna-input');
+    const sendBtn = document.getElementById('luna-send');
+    const history = [];
+
+    function append(role, text){
+      const div = document.createElement('div');
+      div.className = 'luna-msg ' + (role === 'user' ? 'user' : 'bot');
+      div.textContent = text;
+      bodyEl.appendChild(div);
+      bodyEl.scrollTop = bodyEl.scrollHeight;
+    }
+
+    launcher.addEventListener('click', ()=>{
+      panel.style.display = panel.style.display === 'none' || panel.style.display === '' ? 'block' : 'none';
+      if(panel.style.display==='block' && bodyEl.children.length===0){
+        append('bot', 'Hei! Jeg er Luna. Hva lurer du på – pris, kvalitet eller leveringstid?');
+      }
+    });
+
+    async function send(){
+      const msg = inputEl.value.trim();
+      if(!msg) return;
+      append('user', msg);
+      inputEl.value = '';
+      try{
+        const resp = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: msg, history })
+        });
+        const data = await resp.json();
+        const answer = data.answer || 'Beklager, noe gikk galt. Prøv igjen.';
+        append('bot', answer);
+        history.push({ role:'user', content: msg }, { role:'assistant', content: answer });
+      }catch(e){
+        append('bot', 'Teknisk feil – prøv igjen om litt.');
+      }
+    }
+
+    sendBtn.addEventListener('click', send);
+    inputEl.addEventListener('keydown', (e)=>{ if(e.key==='Enter') send(); });
+  </script>
+</body>
+</html>
