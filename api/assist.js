@@ -74,11 +74,59 @@ export default async function handler(req, res) {
     // });
     // const answer = completion.choices[0].message.content;
 
-    const answer = `Takk for meldingen! (Demo uten LLM)\n\n` +
-      `Spørsmål: ${message}\n` +
-      (kbHits[0] ? `Mulig svar fra FAQ: ${kbHits[0].a}` : `Jeg finner ikke et direkte svar i FAQ. Vil du at vi gir et uforpliktende tilbud?`);
+    // === START: ekte LLM-svar med fallback ===
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-    return res.status(200).json({ answer });
+// Bygg en systemprompt som gir modellen kontekst
+const system = systemPrompt || "Du er en hjelpsom norsk kundeserviceassistent for Luna Media.";
+
+// Gi modellen hint om beste FAQ-treff (om vi fant noe)
+const hint = kbHits && kbHits[0]
+  ? `\n\nFaglig hint (fra kunnskapsbase): ${kbHits[0].a}`
+  : "";
+
+// Brukerprompt – selve spørsmålet
+const user = `Kunde spør: ${message}${hint}
+Svar kort, presist og vennlig. Inkluder kun det som er relevant.`;
+
+// Hvis API-nøkkelen finnes, spør modellen. Ellers bruk fallbacken vår.
+let answer;
+
+if (OPENAI_API_KEY) {
+  const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${OPENAI_API_KEY}`
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",          // bruk evt. annet navn hvis du vil
+      temperature: 0.3,
+      max_tokens: 400,
+      messages: [
+        { role: "system", content: system },
+        { role: "user",   content: user }
+      ]
+    })
+  });
+
+  const data = await resp.json();
+
+  // Hent modellens svar, fall tilbake til FAQ-hint om noe skulle feile
+  answer =
+    data?.choices?.[0]?.message?.content?.trim()
+    || (kbHits && kbHits[0] ? kbHits[0].a : null)
+    || "Beklager, jeg har ikke et godt svar på dette akkurat nå.";
+} else {
+  // Fallback hvis nøkkel mangler
+  answer =
+    (kbHits && kbHits[0] ? kbHits[0].a : null)
+    || "Beklager, jeg har ikke et godt svar på dette akkurat nå.";
+}
+
+return res.status(200).json({ answer });
+// === SLUTT: ekte LLM-svar med fallback ===
+
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });
