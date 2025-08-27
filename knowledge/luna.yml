@@ -1,0 +1,47 @@
+firma:
+  navn: "Luna Media"
+  byer:
+    - Oslo
+    - Tønsberg
+  adresser:
+    oslo: "Traxi, Sofies gate 66A, 0170 Oslo (levering/henting etter avtale)"
+    tonsberg: "Sem Senteret (2. etg.), Andebuveien 3, Sem"
+  telefon: "+47 33 74 02 80"
+  epost: "kontakt@lunamedia.no"
+  apningstider:
+    hverdager: "10–16 man-fre, 10-18 torsdag (ring gjerne for avtale)"
+    lordag: "Stengt"
+    sondag: "Stengt"
+
+tjenester:
+  - navn: "Digitalisering av videokassetter (VHS, m.fl.)"
+    beskrivelse: "Konvertering til MP4/filer eller minnepenn."
+  - navn: "Digitalisering av smalfilm 8 mm / Super 8"
+    beskrivelse: "Høy kvalitet; rens og skånsom behandling."
+  - navn: "Foto– og dias-retusjering"
+    beskrivelse: "AI-støttet restaurering og fargekorrigering."
+  - navn: "Dronefoto og -video"
+    beskrivelse: "4K-video, stillfoto."
+
+priser:
+  vhs_per_time: 315          # NOK per time digitalisert video
+  minnepenn: 295             # NOK pr stk (pris er avhengig av størrelse på minnepenn - se full oversikt på lunamedia.no/priser)
+  smalfilm_per_minutt: 75    # NOK per minutt (i tillegg ko0mmer et startgebyr pr rull på kr 95,-)
+  scanning_foto_per_stk: 15  # NOK per bilde (vi skanner i den kvaliteten du ønsker - se detaljert prisoversikt på lunamedia.no/foto)
+
+levering:
+  standard_dager: "7–14"
+  rush_mulig: true
+  rush_tillegg: "Avklares i pristilbud du vil få fra oss; avhenger av volum og kapasitet."
+
+faq:
+  - q: "Hvilke formater digitaliserer dere?"
+    a: "Smalfilm: Super 8/8 mm/16 mm, Video: VHS/VHS-C/Video8/Hi8/MiniDV m.fl., Foto: lysbilder/dias og papirfoto, Lyd: lydbånd/lydkassetter/Diktafon-kassetter, Annet: papirdokumenter, datadisketter mm."
+  - q: "Hvordan leveres filene?"
+    a: "Som MP4-filer på USB-minnepenn (med 10 års garanti) eller DVD (kan kjøpes hos oss) eller via nedlasting."
+  - q: "Tar dere vare på originalene?"
+    a: "Ja, originaler returneres etter digitalisering."
+  - q: "Hvor lang leveringstid er det?"
+    a: "Normalt 7–14 virkedager for moderate mengder. Større oppdrag avtales. Fremskyndet levering er mulig ved kapasitet."
+  - q: "Har dere butikk eller kun avtale?"
+    a: "Levering/henting etter avtale. Se adresser i Oslo/Tønsberg."
