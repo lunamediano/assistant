@@ -8,3 +8,18 @@
   a: Du kan levere hos oss i Vestfold eller sende i posten. Vi pakker alt trygt ved retur.
 - q: Hvilke filformater får jeg?
   a: Standard er MP4 (H.264) for TV, mobil og PC. Andre formater er mulig på forespørsel.
+# Legg dette nederst i assistant/data/faq.yaml
+
+- q: "Digitaliserer dere smalfilm (8 mm / Super 8)?"
+  alt:
+    - "digitaliserer dere smalfilm"
+    - "super 8 digitalisering"
+    - "8mm overføring til fil"
+  a: "Ja, vi digitaliserer smalfilm (8 mm / Super 8). Vi bruker MWA-skanner med WetGate som fjerner 70–80% av riper/smuss. Du kan få filene som MP4 i høy kvalitet eller som ProRes/MOV."
+
+- q: "Hva koster det å digitalisere smalfilm?"
+  alt:
+    - "pris super 8"
+    - "kostnad smalfilm per minutt"
+    - "hva koster 15 meter film"
+  a: "Ca. kr 75 per minutt ferdig film + oppstartsgebyr kr 95 per rull. Ved større mengder gir vi rabatt."
