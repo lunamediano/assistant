@@ -74,16 +74,23 @@ export default async function handler(req, res) {
     // });
     // const answer = completion.choices[0].message.content;
 
-    // === START: LLM med robust feilhåndtering og fallback ===
+// Robust LLM-kall med fallback – bruker din eksisterende `system`
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const model = process.env.LUNA_MODEL || "gpt-4o-mini"; // kan settes i Vercel hvis du vil teste annet
+const model = process.env.LUNA_MODEL || "gpt-4o-mini";
 
-const system = systemPrompt || "Du er en hjelpsom norsk kundeserviceassistent for Luna Media.";
-const hint = kbHits && kbHits[0] ? `\n\nHint fra kunnskapsbase: ${kbHits[0].a}` : "";
+// Hvis du har en systemPrompt fra fil, bruk den; ellers bruk `system` som du allerede har definert.
+const systemFinal =
+  (typeof systemPrompt === "string" && systemPrompt.trim())
+    ? systemPrompt
+    : system;
+
+// Historikk hvis du har; unngå crash
+const chatHistory = Array.isArray(history) ? history : [];
+
+const hint = kbHits?.[0]?.a ? `\n\nHint fra kunnskapsbase: ${kbHits[0].a}` : "";
 const user = `Kunde spør: ${message}${hint}
 Svar kort, presist og vennlig. Svar på norsk.`;
 
-// Default svar (hvis alt feiler)
 let answer = kbHits?.[0]?.a || "Beklager, jeg har ikke et godt svar på dette akkurat nå.";
 
 if (!OPENAI_API_KEY) {
@@ -94,8 +101,9 @@ if (!OPENAI_API_KEY) {
     temperature: 0.3,
     max_tokens: 400,
     messages: [
-      { role: "system", content: system },
-      { role: "user",   content: user }
+      { role: "system", content: systemFinal },
+      ...chatHistory,
+      { role: "user", content: user }
     ]
   };
 
@@ -110,8 +118,8 @@ if (!OPENAI_API_KEY) {
       body: JSON.stringify(payload)
     });
 
-    text = await resp.text(); // les som tekst for bedre logging ved feil
-    try { data = JSON.parse(text); } 
+    text = await resp.text();
+    try { data = JSON.parse(text); }
     catch (e) {
       console.error("OpenAI: JSON parse error:", text);
       throw new Error("Kunne ikke tolke svar fra OpenAI");
@@ -130,12 +138,12 @@ if (!OPENAI_API_KEY) {
     }
   } catch (e) {
     console.error("OpenAI-kall feilet:", e?.message);
-    // answer forblir satt til FAQ-fallbacken over
+    // behold FAQ-fallback i `answer`
   }
 }
 
 return res.status(200).json({ answer });
-// === SLUTT ===
+
 
 
   } catch (err) {
