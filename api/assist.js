@@ -47,6 +47,10 @@ export default async function handler(req, res) {
     const { faq, prices } = loadData();
     const kbHits = simpleSearch(message, faq || []);
 
+// 1) FAQ først: hvis vi har et godt treff, svar direkte og returnér
+if (kbHits?.[0]?.a) {
+  return res.status(200).json({ answer: kbHits[0].a });
+}
     const system = [
       'Du er "Luna" – en vennlig og presis AI-assistent for Luna Media (Vestfold).',
       'Svar kort på norsk. Bruk priseksempler og FAQ nedenfor når relevant.',
