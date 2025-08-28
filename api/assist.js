@@ -7,10 +7,21 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 
-// ---------- Safe file helpers ----------
-function safeRead(file, kind = "text") {
+/* =========================
+   Safe helpers (med logging)
+   ========================= */
+function fileInfo(p) {
   try {
-    const raw = fs.readFileSync(file, "utf8");
+    const s = fs.statSync(p);
+    return { exists: true, size: s.size };
+  } catch {
+    return { exists: false, size: 0 };
+  }
+}
+
+function safeRead(p, kind = "text") {
+  try {
+    const raw = fs.readFileSync(p, "utf8");
     if (kind === "json") return JSON.parse(raw);
     if (kind === "yaml") return yaml.load(raw);
     return raw;
@@ -19,51 +30,73 @@ function safeRead(file, kind = "text") {
   }
 }
 
-// ---------- Load data from multiple locations ----------
-function loadData() {
-  // Mulige kilder for FAQ
+/* =====================================
+   Last data fra flere lokasjoner + debug
+   ===================================== */
+function loadData(debug = false) {
+  const tried = [];
+  const loaded = [];
+
   const faqCandidates = [
     path.join(__dirname, "..", "data", "faq.yaml"),
     path.join(__dirname, "..", "knowledge", "faq_round1.yml"),
     path.join(__dirname, "..", "knowledge", "faq_round1.yaml"),
-    path.join(__dirname, "..", "knowledge", "luna.yml"),
+    path.join(__dirname, "..", "knowledge", "luna.yml")
   ];
 
   let faq = [];
   let prices = {};
 
   for (const p of faqCandidates) {
-    const isLuna = p.endsWith("luna.yml");
+    const info = fileInfo(p);
+    tried.push({ path: p, ...info });
+    if (!info.exists) continue;
+
     const parsed = safeRead(p, "yaml");
     if (!parsed) continue;
 
-    // Hvis det er luna.yml, prøv å hente faq- og priser-seksjonene
-    if (isLuna) {
+    loaded.push({ path: p, size: info.size });
+
+    if (p.endsWith("luna.yml")) {
       const fromLunaFaq =
         Array.isArray(parsed?.faq) ? parsed.faq :
         Array.isArray(parsed?.knowledge?.faq) ? parsed.knowledge.faq : [];
       if (fromLunaFaq?.length) faq = faq.concat(fromLunaFaq);
 
       const fromLunaPrices = parsed?.priser || parsed?.prices || parsed?.company?.prices;
-      if (fromLunaPrices && typeof fromLunaPrices === "object")
+      if (fromLunaPrices && typeof fromLunaPrices === "object") {
         prices = { ...prices, ...fromLunaPrices };
+      }
     } else {
-      // Andre yaml: kan være {faq: [...]} eller bare [...]
       const items = Array.isArray(parsed) ? parsed : (parsed?.faq || []);
       if (items?.length) faq = faq.concat(items);
     }
   }
 
-  // Priser fra JSON hvis finnes
-  const priceJson = safeRead(path.join(__dirname, "..", "data", "priser.json"), "json");
-  if (priceJson && typeof priceJson === "object") {
-    prices = { ...prices, ...priceJson };
+  // Priser fra JSON
+  const priceJsonPath = path.join(__dirname, "..", "data", "priser.json");
+  const pjInfo = fileInfo(priceJsonPath);
+  tried.push({ path: priceJsonPath, ...pjInfo });
+  if (pjInfo.exists) {
+    const pj = safeRead(priceJsonPath, "json");
+    if (pj && typeof pj === "object") {
+      loaded.push({ path: priceJsonPath, size: pjInfo.size });
+      prices = { ...prices, ...pj };
+    }
   }
 
-  return { faq, prices };
+  if (debug) {
+    console.log("DATA DEBUG — tried:", tried);
+    console.log("DATA DEBUG — loaded:", loaded);
+    console.log("DATA DEBUG — counts:", { faq: faq.length, priceKeys: Object.keys(prices || {}).length });
+  }
+
+  return { faq, prices, _dataDebug: { tried, loaded, faqCount: faq.length, priceKeys: Object.keys(prices || {}).length } };
 }
 
-// ---------- FAQ-søk (presis) ----------
+/* =========================
+   FAQ-søk (presis Jaccard)
+   ========================= */
 function normalize(s = "") {
   return (s + "")
     .toLowerCase()
@@ -110,7 +143,9 @@ function simpleSearch(userMessage, faqArray, minScore = 0.65) {
   return [];
 }
 
-// ---------- Handler ----------
+/* ===========
+   HTTP handler
+   =========== */
 export default async function handler(req, res) {
   // CORS
   const allowed = (process.env.LUNA_ALLOWED_ORIGINS || "*")
@@ -142,17 +177,32 @@ export default async function handler(req, res) {
     if (!message) return res.status(400).json({ error: "Missing message" });
 
     // 1) Hent data og match FAQ
-    const { faq, prices } = loadData();
-    console.log("Loaded FAQ:", faq.length, "Loaded prices keys:", Object.keys(prices).length);
+    const { faq, prices, _dataDebug } = loadData(debug);
+    console.log("Loaded FAQ:", faq.length, "Loaded price keys:", Object.keys(prices).length);
 
     const kbHits = simpleSearch(message, faq);
-    console.log("FAQ hits:", kbHits.length, "for:", message, kbHits[0] ? `-> "${kbHits[0].q}" (${kbHits[0].score.toFixed(2)})` : "");
+    console.log(
+      "FAQ hits:", kbHits.length,
+      "for:", JSON.stringify(message),
+      kbHits[0] ? `-> "${kbHits[0].q}" (score ${kbHits[0].score.toFixed(2)})` : "(ingen treff)"
+    );
 
     // 2) FAQ har førsteprioritet
     if (kbHits?.[0]?.a) {
-      const payload = { answer: kbHits[0].a };
-      if (debug) payload._debug = { source: "faq", score: kbHits[0].score };
+      const payload = {
+        answer: kbHits[0].a
+      };
+      if (debug) {
+        payload._debug = {
+          source: "faq",
+          score: kbHits[0].score,
+          matchedQuestion: kbHits[0].q,
+          data: _dataDebug
+        };
+      }
       return res.status(200).json(payload);
+    } else {
+      if (debug) console.log("Ingen FAQ-treff — fortsetter med LLM/fallback.");
     }
 
     // 3) LLM prompt
@@ -173,14 +223,15 @@ export default async function handler(req, res) {
 Bruk kun fakta fra "Priser" over hvis relevant. Hvis svaret ikke finnes, si at du er usikker og foreslå kontakt.
 Svar på norsk, maks 2–3 setninger.`;
 
-    // fallback hvis LLM feiler/mangler
-    let answer = "Beklager, jeg har ikke et godt svar på dette akkurat nå. " +
-                 "Send oss gjerne en e-post på kontakt@lunamedia.no eller ring 33 74 02 80.";
+    // Fallback hvis LLM mangler/feiler
+    let answer =
+      "Beklager, jeg har ikke et godt svar på dette akkurat nå. " +
+      "Send oss gjerne en e-post på kontakt@lunamedia.no eller ring 33 74 02 80.";
 
     if (!OPENAI_API_KEY) {
       console.warn("Mangler OPENAI_API_KEY – hopper over LLM og bruker fallback.");
       const payload = { answer };
-      if (debug) payload._debug = { source: "fallback_no_key" };
+      if (debug) payload._debug = { source: "fallback_no_key", data: _dataDebug };
       return res.status(200).json(payload);
     }
 
@@ -206,7 +257,8 @@ Svar på norsk, maks 2–3 setninger.`;
 
       const text = await resp.text();
       let data;
-      try { data = JSON.parse(text); } catch { throw new Error("OpenAI JSON parse error: " + text); }
+      try { data = JSON.parse(text); }
+      catch { throw new Error("OpenAI JSON parse error: " + text); }
 
       if (!resp.ok) {
         console.error("OpenAI HTTP error:", resp.status, data?.error || data);
@@ -218,12 +270,12 @@ Svar på norsk, maks 2–3 setninger.`;
       else console.warn("OpenAI: tomt content i svar:", data);
 
       const payload = { answer };
-      if (debug) payload._debug = { source: "openai" };
+      if (debug) payload._debug = { source: "openai", data: _dataDebug };
       return res.status(200).json(payload);
     } catch (e) {
       console.error("OpenAI-kall feilet:", e?.message);
       const payload = { answer };
-      if (debug) payload._debug = { source: "fallback_openai_error", error: e?.message };
+      if (debug) payload._debug = { source: "fallback_openai_error", error: e?.message, data: _dataDebug };
       return res.status(200).json(payload);
     }
   } catch (err) {
