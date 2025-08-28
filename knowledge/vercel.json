@@ -5,5 +5,13 @@
   ],
   "routes": [
     { "src": "/api/assist", "dest": "/api/assist.js" }
-  ]
+  ],
+  "functions": {
+    "api/assist.js": {
+      "includeFiles": [
+        "knowledge/**",
+        "data/**"
+      ]
+    }
+  }
 }
