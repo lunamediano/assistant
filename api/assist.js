@@ -74,58 +74,69 @@ export default async function handler(req, res) {
     // });
     // const answer = completion.choices[0].message.content;
 
-    // === START: ekte LLM-svar med fallback ===
+    // === START: LLM med robust feilhåndtering og fallback ===
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const model = process.env.LUNA_MODEL || "gpt-4o-mini"; // kan settes i Vercel hvis du vil teste annet
 
-// Bygg en systemprompt som gir modellen kontekst
 const system = systemPrompt || "Du er en hjelpsom norsk kundeserviceassistent for Luna Media.";
-
-// Gi modellen hint om beste FAQ-treff (om vi fant noe)
-const hint = kbHits && kbHits[0]
-  ? `\n\nFaglig hint (fra kunnskapsbase): ${kbHits[0].a}`
-  : "";
-
-// Brukerprompt – selve spørsmålet
+const hint = kbHits && kbHits[0] ? `\n\nHint fra kunnskapsbase: ${kbHits[0].a}` : "";
 const user = `Kunde spør: ${message}${hint}
-Svar kort, presist og vennlig. Inkluder kun det som er relevant.`;
+Svar kort, presist og vennlig. Svar på norsk.`;
 
-// Hvis API-nøkkelen finnes, spør modellen. Ellers bruk fallbacken vår.
-let answer;
+// Default svar (hvis alt feiler)
+let answer = kbHits?.[0]?.a || "Beklager, jeg har ikke et godt svar på dette akkurat nå.";
 
-if (OPENAI_API_KEY) {
-  const resp = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${OPENAI_API_KEY}`
-    },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",          // bruk evt. annet navn hvis du vil
-      temperature: 0.3,
-      max_tokens: 400,
-      messages: [
-        { role: "system", content: system },
-        { role: "user",   content: user }
-      ]
-    })
-  });
-
-  const data = await resp.json();
-
-  // Hent modellens svar, fall tilbake til FAQ-hint om noe skulle feile
-  answer =
-    data?.choices?.[0]?.message?.content?.trim()
-    || (kbHits && kbHits[0] ? kbHits[0].a : null)
-    || "Beklager, jeg har ikke et godt svar på dette akkurat nå.";
+if (!OPENAI_API_KEY) {
+  console.warn("Mangler OPENAI_API_KEY – bruker FAQ-fallback.");
 } else {
-  // Fallback hvis nøkkel mangler
-  answer =
-    (kbHits && kbHits[0] ? kbHits[0].a : null)
-    || "Beklager, jeg har ikke et godt svar på dette akkurat nå.";
+  const payload = {
+    model,
+    temperature: 0.3,
+    max_tokens: 400,
+    messages: [
+      { role: "system", content: system },
+      { role: "user",   content: user }
+    ]
+  };
+
+  let resp, text, data;
+  try {
+    resp = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${OPENAI_API_KEY}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    text = await resp.text(); // les som tekst for bedre logging ved feil
+    try { data = JSON.parse(text); } 
+    catch (e) {
+      console.error("OpenAI: JSON parse error:", text);
+      throw new Error("Kunne ikke tolke svar fra OpenAI");
+    }
+
+    if (!resp.ok) {
+      console.error("OpenAI HTTP error:", resp.status, data?.error || data);
+      throw new Error(data?.error?.message || `OpenAI feilkode ${resp.status}`);
+    }
+
+    const content = data?.choices?.[0]?.message?.content?.trim();
+    if (content) {
+      answer = content;
+    } else {
+      console.warn("OpenAI: ingen content i svar:", data);
+    }
+  } catch (e) {
+    console.error("OpenAI-kall feilet:", e?.message);
+    // answer forblir satt til FAQ-fallbacken over
+  }
 }
 
 return res.status(200).json({ answer });
-// === SLUTT: ekte LLM-svar med fallback ===
+// === SLUTT ===
+
 
   } catch (err) {
     console.error(err);
