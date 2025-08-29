@@ -4,8 +4,8 @@ firma:
     - Oslo
     - Tønsberg
   adresser:
+    tonsberg: "Luna Media, Sem Senteret (2. etg.), Andebuveien 3, Sem"
     oslo: "Traxi, Sofies gate 66A, 0170 Oslo (levering/henting etter avtale)"
-    tonsberg: "Sem Senteret (2. etg.), Andebuveien 3, Sem"
   telefon: "+47 33 74 02 80"
   epost: "kontakt@lunamedia.no"
   apningstider:
@@ -15,19 +15,19 @@ firma:
 
 tjenester:
   - navn: "Digitalisering av videokassetter (VHS, m.fl.)"
-    beskrivelse: "Konvertering til MP4/filer eller minnepenn."
+    beskrivelse: "Konvertering til MP4/filer, lagt på USB/minnepenn, DVD eller til nedlasting fra skyløsning."
   - navn: "Digitalisering av smalfilm 8 mm / Super 8"
     beskrivelse: "Høy kvalitet; rens og skånsom behandling."
-  - navn: "Foto– og dias-retusjering"
+  - navn: "Fotoretusjering og -reparasjon"
     beskrivelse: "AI-støttet restaurering og fargekorrigering."
   - navn: "Dronefoto og -video"
     beskrivelse: "4K-video, stillfoto."
 
 priser:
-  vhs_per_time: 315          # NOK per time digitalisert video
-  minnepenn: 295             # NOK pr stk (pris avhenger av størrelse – se lunamedia.no/priser)
-  smalfilm_per_minutt: 75    # NOK per minutt (i tillegg kommer startgebyr pr rull på kr 95,-)
-  scanning_foto_per_stk: 15  # NOK per bilde (kvalitet etter ønske – se lunamedia.no/foto)
+  vhs_per_time: Kr 315,-
+  minnepenn: Fra kr 295,-
+  smalfilm_per_minutt: Fra kr 75,-
+  scanning_foto_per_stk: Fra kr 10,-
 
 levering:
   standard_dager: "7–14"
@@ -35,12 +35,19 @@ levering:
   rush_tillegg: "Avklares i pristilbud; avhenger av volum og kapasitet."
 
 faq:
-  # --- VHS / video (6) ---
+  # --- VHS / video ---
   - q: "Hvor mye koster det å digitalisere en VHS-kassett?"
     alt:
       - "pris vhs"
       - "hva koster digitalisering av videokassett"
       - "digitalisere vhs pris"
+      - "kostnad for å overføre vhs til fil"
+      - "vhs til usb pris"
+      - "digitalisering vhs hvor mye"
+      - "vhs overføring pris"
+      - "pris per time vhs"
+      - "digitalisere videokassetter pris"
+      - "videobånd til mp4 pris"
     a: "Det koster kr 315,- pr digitaliserte time. Har du over 10 timer opptak, får du 10% rabatt, og har du over 20 timer får du 20% rabatt."
 
   - q: "Hvor lang tid tar det å digitalisere videokassetter?"
@@ -48,6 +55,13 @@ faq:
       - "leveringstid vhs"
       - "når er kassettene klare"
       - "hvor raskt får jeg videofilene"
+      - "hvor lang ventetid vhs"
+      - "digitalisere video hvor lenge"
+      - "når kan jeg hente vhs"
+      - "vhs overføring tid"
+      - "digitalisering videokassett leveringstid"
+      - "tid for vhs digitalisering"
+      - "hvor fort digitaliserer dere video"
     a: "Maks 3 uker, men normalt leverer vi i løpet av 4–14 dager."
 
   - q: "Tar dere VHS-C, Video8/Hi8 og MiniDV?"
@@ -55,127 +69,253 @@ faq:
       - "digitaliserer dere hi8"
       - "kan dere ta minidv"
       - "vhs-c mulig"
-    a: "Ja, dette er blant de vanligste formatene, og om du leverer C-VHS trenger du ikke legge ved adapter (som benyttes for å kunne spille av/digitalisere denne kassett-typen)."
+      - "tar dere video8"
+      - "digitalisere mini dv kassetter"
+      - "får dere til hi8 digitalisering"
+      - "video8 til fil"
+      - "camcorder bånd overføring"
+      - "små videokassetter digitalisering"
+      - "tar dere opp miniDV og hi8"
+    a: "Ja, vi digitaliserer alle type videokassetter."
 
-  - q: "Kan dere forbedre kvaliteten fra VHS?"
+  - q: "Kan dere forbedre kvaliteten på video?"
     alt:
       - "blir kvaliteten bedre"
       - "støyreduksjon vhs"
       - "stabilisering og fargekorrigering"
-    a: "Ja, vi justerer fargemetning, kontrast osv., og vi fjerner skurr/synkbrudd. Vi kan også oppskalere bildet til HD. Vi viser gjerne eksempler; forskjellen blir merkbar, spesielt på moderne, store TV-skjermer."
+      - "kan dere rense opp video"
+      - "fjerne støy fra vhs"
+      - "bedre bilde fra gamle vhs"
+      - "kan dere oppskalere video"
+      - "forbedre skurrete opptak"
+      - "få bedre farger på vhs"
+      - "gjøre vhs penere kvalitet"
+    a: "Ja, vi justerer fargemetning, kontrast osv., og vi fjerner skurr/synkbrudd. Vi kan også oppskalere bildet til HDformat. Vi viser deg gjerne eksempler på dette."
 
   - q: "Kan dere legge flere kassetter på én minnepenn?"
     alt:
       - "alt på samme minnepenn"
       - "samle alle filer ett sted"
       - "en minnepenn for alt"
-    a: "Ikke noe problem! Vi har minnepenner som tar opptil 2 TB innhold, omtrent 10 døgn sammenhengende opptak. Minnepennene våre er av god kvalitet og leveres med 10 års garanti."
+      - "kan jeg få alt på en usb"
+      - "får jeg alle videoene samlet"
+      - "slå sammen på minnepenn"
+      - "en stick for alle kassetter"
+      - "alt på en disk"
+      - "får jeg alt på en usb"
+      - "kan dere samle filene"
+    a: "Ikke noe problem! Vi har minnepenner på opptil 2 TB, som kan inneholde opptil 500 timer film/video."
 
-  - q: "Hva gjør dere med blå skjerm/pauser mellom opptak?"
+  - q: "Hva gjør dere med skurr mellom opptak?"
     alt:
       - "fjerner dere blanke partier"
       - "klipper dere bort tomrom"
       - "håndtering av pauser"
-    a: "Vi fjerner skurr og blå sekvenser, samt opptak uten meningsfylt innhold – f.eks. når kameraet har fortsatt å filme etter at det er lagt i en kamerabag."
+      - "redigerer dere bort ingenting"
+      - "kan dere fjerne opptak uten innhold"
+      - "rydder dere i opptaket"
+      - "tar dere bort skurr og tomrom"
+      - "blå skjerm klippes vekk"
+      - "fjernes pausepartier"
+      - "tar dere vekk ubrukelig opptak"
+    a: "Vi fjerner skurr og blå sekvenser, samt opptak uten meningsfylt innhold."
 
-  # --- Smalfilm (5) ---
+  # --- Smalfilm ---
   - q: "Digitaliserer dere smalfilm (8 mm / Super 8)?"
     alt:
       - "super 8 digitalisering"
       - "8mm overføring til fil"
       - "digitalisere smalfilm pris"
-    a: "Ja, vi har en MWA-skanner som gir topp kvalitet. Den har også WetGate-rens som typisk fjerner 70–80% av riper og inngrodd smuss."
+      - "kan dere ta super8"
+      - "digitalisere gamle smalfilmer"
+      - "smalfilm til mp4"
+      - "digitalisere 8 mm film"
+      - "overføre super8 film"
+      - "8mm film til usb"
+      - "smalfilm konvertering"
+    a: "Ja, vi har en MWA-skanner som skanner i 4K-oppløsning. Vi kjenner ikke til andre norske aktører som har filmskanner av samme kvalitet. Skanningen inkluderer også WetGate-rens, som fjerner ca 70–80% av riper og smuss."
 
   - q: "Hva koster det å digitalisere smalfilm?"
     alt:
       - "pris super 8"
       - "kostnad per minutt smalfilm"
       - "hva koster 15 meter film"
-    a: "Ca. kr 75 per minutt digitalisert film, pluss kr 95 i startgebyr per rull (inkl. mva). Ved større mengder gir vi rabatt."
+      - "digitalisere 8mm film pris"
+      - "smalfilm til digital pris"
+      - "pris på smalfilm overføring"
+      - "super8 kostnad"
+      - "hvor mye koster smalfilm"
+      - "smalfilm digitalisering kostnad"
+      - "digitalisere filmruller pris"
+    a: "Ca. kr 75 per minutt for digitalisert film, pluss kr 95,- i startgebyr per rull. De minste filmrullene (med diameter 7 cm) inneholder typisk 3 min 20 sek med film."
 
-  - q: "Bruker dere skånsom rens (f.eks. WetGate™)?"
+  - q: "Renser dere filmene?"
     alt:
       - "rens av smalfilm"
       - "wetgate tilgjengelig"
       - "bildestøy og riper"
-    a: "MWA-skanneren vår har en innovativ WetGate-rens som fjerner 70–80% av riper og inngrodd smuss. Så vidt vi vet, er vi alene i Norge om å inkludere dette i all digitalisering."
+      - "kan dere rense smalfilm"
+      - "fjerner dere riper fra film"
+      - "renseteknikk smalfilm"
+      - "wet gate rens"
+      - "smalfilm rens kvalitet"
+      - "skånsom digitalisering"
+      - "rens av super8 film"
+    a: "Ja, vår MWA-skanner har en unik WetGate-rensefunskjon, som fjerner typisk 70–80% av riper og inngrodd smuss."
 
   - q: "Hvilket filformat og oppløsning leverer dere for smalfilm?"
     alt:
       - "mp4 eller annen fil"
       - "kvalitet smalfilm"
       - "kan jeg få 4K"
-    a: 'Du kan velge råformat/ukomprimert (ProRes/MOV) eller MPEG-4 med høy bitrate (opptil 4K). For de fleste fungerer MPEG-4 utmerket – også på store Smart-TV-er.'
+      - "hva slags fil får jeg"
+      - "filmformat for smalfilm"
+      - "oppløsning super8 digitalisering"
+      - "får jeg mov eller mp4"
+      - "hva slags kvalitet får jeg"
+      - "kan jeg få ukomprimert fil"
+      - "smalfilm leveranse format"
+    a: 'Du kan velge råformat/ukomprimert (ProRes/MOV) eller MPEG-4 i 4K-format med høyeste bitrate.'
 
-  - q: "Hvor lang leveringstid er vanlig for smalfilm?"
+  - q: "Hvor lang leveringstid er vanlig?"
     alt:
       - "leveringstid super 8"
       - "hvor lang tid tar smalfilm"
       - "når blir filmene klare"
+      - "hvor lang ventetid på smalfilm"
+      - "digitalisering smalfilm hvor lenge"
+      - "super8 leveringstid"
+      - "hvor raskt leveres smalfilm"
+      - "tid for digitalisering smalfilm"
+      - "når får jeg smalfilm ferdig"
+      - "ferdigstilling smalfilm"
     a: "Maks 3 uker, normalt 4–14 dager."
 
-  # --- Foto, dias, negativer (3) ---
+  # --- Foto ---
   - q: "Skanner dere papirbilder, lysbilder og negativer?"
     alt:
       - "digitalisere dias"
       - "skanne negativer"
       - "skanning av gamle bilder"
-    a: "Ja, vi skanner papirbilder, lysbilder/dias og negativer."
+      - "foto skanning"
+      - "skanne papirbilder"
+      - "overføre lysbilder"
+      - "scan dias til fil"
+      - "digitalisere gamle foto"
+      - "skanning negativer"
+      - "bilder til digital fil"
+    a: "Ja, vi skanner papirbilder, lysbilder/dias og negativer, i alle størrelser."
 
   - q: "Hva koster fotoskanning, og i hvilken oppløsning leverer dere?"
     alt:
       - "pris skanning foto"
       - "dpi kvalitet"
       - "oppløsning på bildene"
-    a: "Du velger ønsket oppløsning – vi anbefaler ut fra bruken. Rimeligste alternativ koster ca. kr 10 per bilde/dias inkl. mva."
+      - "kostnad for bilde skanning"
+      - "skanne bilder pris"
+      - "skanning av dias pris"
+      - "negativer scanning pris"
+      - "foto scanning oppløsning"
+      - "bildefiler kvalitet"
+      - "skanning priser foto"
+    a: "Du velger ønsket oppløsning – rimeligste alternativ koster ca. kr 10,- per bilde/dias inkl. mva."
 
   - q: "Tilbyr dere retusjering og fargekorrigering av bilder?"
     alt:
       - "reparere riper og støv"
       - "forbedre gamle bilder"
       - "restaurering av foto"
-    a: "Ja, vi retusjerer og reparerer gamle fotografier, og kan levere fotoutskrifter av høy kvalitet."
+      - "kan dere reparere gamle bilder"
+      - "retusjering pris"
+      - "foto korrigering"
+      - "bildereparasjon"
+      - "fargekorrigere foto"
+      - "fikse gamle bilder"
+      - "fotorestaurering"
+    a: "Ja, vi retusjerer og reparerer gamle fotografier, og viser deg gjerne eksempler på dette."
 
-  # --- Levering / henting / lokasjon (3) ---
-  - q: "Hvor kan jeg levere i Oslo og Tønsberg?"
+  # --- Levering ---
+  - q: "Hvor kan jeg levere?"
     alt:
       - "adresse oslo"
       - "adresse tønsberg"
       - "innlevering hos dere"
-    a: "Levering på Sem Senteret (2. etg.), Andebuveien 3, 3170 Sem – eller til vår desk på Bislett i Oslo (etter avtale). Du kan også sende Norgespakke med sporing til Luna Media, Pb. 60, 3107 Sem (bruk mottakers mobil 997 05 630)."
+      - "leveringssteder luna media"
+      - "kan jeg levere i oslo"
+      - "hvor levere i tønsberg"
+      - "leveringsadresse"
+      - "kontor i oslo eller tønsberg"
+      - "innlevering video oslo"
+      - "hvor levere smalfilm"
+    a: "Du kan levere materialet til oss i Sem Senteret på Sem ved Tønsberg, eller til vår desk på Bislett i Oslo (etter avtale). Du kan også sende Norgespakke."
 
   - q: "Må jeg avtale tid før levering og henting?"
     alt:
       - "åpningstider"
       - "kan jeg komme når som helst"
       - "booking av levering"
-    a: "Vi har åpent man–fre 10–16 (tors 10–18). Ring gjerne 33 74 02 80 før du kommer, så er vi sikre på å være til stede."
+      - "må jeg ringe først"
+      - "trenger jeg avtale tid"
+      - "åpning luna media"
+      - "når har dere åpent"
+      - "henting avtale"
+      - "åpningstider butikk"
+      - "besøke uten avtale"
+    a: "Vi har åpent man–fre 10–16 (tors 10–18). Ring gjerne 33 74 02 80 før du kommer."
 
   - q: "Kan dere sende filer/minnepenn i posten?"
     alt:
       - "postforsendelse"
       - "kan dere sende minnepenn"
       - "frakt og retur"
-    a: "Ja, vi sender med Norgespakke og sporing når vi returnerer minnepenn, film og bilder."
+      - "kan jeg få sendt filene"
+      - "sender dere i posten"
+      - "levering via post"
+      - "får jeg usb i posten"
+      - "retur i posten"
+      - "kan dere sende alt hjem"
+      - "postforsendelse av filmer"
+    a: "Ja, vi sender med Norgespakke og sporing."
 
-  # --- Priser og betaling (3) ---
+  # --- Betaling ---
   - q: "Gir dere mengderabatt ved mange kassetter eller bilder?"
     alt:
       - "rabatt store mengder"
       - "pris ved mange"
       - "pakkepris"
-    a: "Ja. Over 10 timer video: 10% rabatt, over 20 timer: 20% rabatt. For større mengder lager vi et eget tilbud."
+      - "rabatt ved mye film"
+      - "får jeg avslag hvis mye"
+      - "masse digitalisering pris"
+      - "rabatter store bestillinger"
+      - "prisreduksjon mange kassetter"
+      - "rabatt når mye materiale"
+      - "mengderabatt bilder"
+    a: "Ja, om du sender oss en e-post til kontakt@lunamedia.no, eller ringer oss på tlf. 33 74 02 80, så vil vi gi deg et prisestimat-/tilbud, med rabatt ut i fra størrelsen på oppdraget."
 
   - q: "Hvordan kan jeg betale?"
     alt:
       - "tar dere vipps"
       - "kortbetaling"
       - "faktura mulig"
-    a: "Du kan betale med Vipps ved henting, eller få faktura til betaling via nettbank."
+      - "hvordan betaler jeg"
+      - "kan jeg betale kontant"
+      - "betaling måter"
+      - "kan jeg betale med kort"
+      - "betaling vipps eller faktura"
+      - "betaling alternativer"
+      - "må jeg betale på forhånd"
+    a: "Du kan betale med Vipps ved henting, eller få med faktura som du kan betale i nettbanken din."
 
   - q: "Er minnepenn inkludert i prisen?"
     alt:
       - "koster minnepenn ekstra"
       - "kan jeg levere egen minnepenn"
       - "levering på nedlasting"
-    a: "USB-minnepenn er ikke inkludert i digitaliseringsprisen. Vi har flere størrelser (se priser på lunamedia.no/priser), eller du kan levere egen."
+      - "må jeg kjøpe usb i tillegg"
+      - "følger usb med"
+      - "inkludert minnepenn?"
+      - "usb stick med på kjøpet"
+      - "ekstra pris usb"
+      - "leverer dere på egen minnepenn"
+      - "må jeg kjøpe minnepenn"
+    a: "USB-minnepenn er ikke inkludert i prisen, men kan kjøpes hos oss. Vi har minnepenner i ulike størrelser, de kan brukes i Smart-TV, PC og Mac, og leveres alle med 10 års garanti."
