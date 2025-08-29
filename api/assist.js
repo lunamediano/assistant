@@ -91,6 +91,21 @@ function loadData(debug = false) {
     console.log("DATA DEBUG — counts:", { faq: faq.length, priceKeys: Object.keys(prices || {}).length });
   }
 
+// Rett før return i assist.js
+
+// FAQ
+if (kbHits?.[0]?.a) {
+  return res.status(200).json({
+    answer: kbHits[0].a,
+    source: "FAQ"
+  });
+}
+
+// AI (etter OpenAI-kall)
+const payload = { answer, source: "AI" };
+return res.status(200).json(payload);
+
+
   return { faq, prices, _dataDebug: { tried, loaded, faqCount: faq.length, priceKeys: Object.keys(prices || {}).length } };
 }
 
