@@ -228,6 +228,17 @@ Svar på norsk, maks 2–3 setninger.`;
       "Beklager, jeg har ikke et godt svar på dette akkurat nå. " +
       "Send oss gjerne en e-post på kontakt@lunamedia.no eller ring 33 74 02 80.";
 
+     // --- Midlertidig bryter: slå av LLM hvis USE_LLM=false ---
+if (process.env.USE_LLM === "false") {
+  const payload = { answer:
+    "Beklager, jeg kan ikke hente ut mer informasjon akkurat nå, men jeg hjelper deg gjerne: " +
+    "Spør meg om priser, leveringstid eller formater så svarer jeg etter vår FAQ. " +
+    "Du kan også skrive til kontakt@lunamedia.no eller ringe 33 74 02 80."
+  };
+  if (debug) payload._debug = { source: "faq_only_mode" };
+  return res.status(200).json(payload);
+}
+
     if (!OPENAI_API_KEY) {
       console.warn("Mangler OPENAI_API_KEY – hopper over LLM og bruker fallback.");
       const payload = { answer };
