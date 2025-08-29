@@ -133,7 +133,7 @@ faq:
       - "pris ved mange"
       - "pakkepris"
     a: "Ja, vi gir rabatt ut i fra mengde film eller video som leveres inn. Eksempelvis, har du over 10 timer videoopptak, får du 10% rabatt, og har du over 20 timer får du 20% rabatt."
-
+  
   - q: "Hvordan kan jeg betale?"
     alt:
       - "tar dere vipps"
@@ -148,14 +148,14 @@ faq:
       - "levering på nedlasting"
     a: "USB-minnepenn er ikke inkludert i prisen for digitalisering. Vi har minnepenner i ulike størrelser, og du finner prisene for disse under lunamedia.no/priser."
 
-    - q: "Digitaliserer dere smalfilm (8 mm / Super 8)?"
+  - q: "Digitaliserer dere smalfilm (8 mm / Super 8)?"
   alt:
     - "digitaliserer dere smalfilm"
     - "super 8 digitalisering"
     - "8mm overføring til fil"
   a: "Ja, vi digitaliserer smalfilm (8 mm / Super 8). Vi bruker MWA-skanner med WetGate som fjerner 70–80% av riper/smuss. Du kan få filene som MP4 i høy kvalitet eller som ProRes/MOV."
 
-- q: "Hva koster det å digitalisere smalfilm?"
+  - q: "Hva koster det å digitalisere smalfilm?"
   alt:
     - "pris super 8"
     - "kostnad smalfilm per minutt"
