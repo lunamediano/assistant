@@ -212,9 +212,10 @@ function priceSmalfilm({ minutter, ruller }, prices, history) {
     const altTotal = round5(min * perMin * (1 - disc) + 2 * startGeb);
     txt += ` (Hvis dette gjelder 2 ruller, blir det ca ${formatNOK(altTotal)} kr.)`;
   }
-  if (disc > 0) {
-    txt += ` (Rabatt er inkludert: ${Math.round(disc * 100)}% for ${(min/60).toFixed(1)} timer totalt.)`;
-  }
+ if (disc > 0) {
+  const threshold = (disc === 0.20) ? 20 : 10;
+  msg += ` (Rabatt inkludert: ${(disc*100).toFixed(0)}% for over ${threshold} timer.)`;
+}
   txt += ` USB/minnepenn kommer i tillegg (fra ${usbMin} kr).`;
   return txt;
 }
