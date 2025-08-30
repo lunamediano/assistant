@@ -4,6 +4,7 @@
   "type": "module",
   "private": true,
   "dependencies": {
-    "js-yaml": "^4.1.0"
+    "js-yaml": "^4.1.0",
+    "resend": "^3.0.0"
   }
 }
