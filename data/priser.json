@@ -1,19 +1,58 @@
 {
-  "vhs_per_kassett": 390,
-  "smalfilm_per_minutt": 20,
-  "minnepenn_fastpris": 199,
-  "oppgradering_ai_per_time": 350,
-  "eksempler": [
-    {
-      "tittel": "3 VHS‑kassetter + minnepenn",
-      "pris": 1369,
-      "beskrivelse": "Digitalisering av 3 kassetter til MP4, levert på minnepenn."
-    },
-    {
-      "tittel": "50 min smalfilm + deling",
-      "pris": 1000,
-      "beskrivelse": "Skan av smalfilm, grunnleggende farge/kontrastjustering, fil levert for nedlasting."
-    }
-  ],
-  "forbehold": "Endelige priser avhenger av faktisk spilletid/tilstand. Be om tilbud for nøyaktig pris."
+  "valuta": "NOK",
+
+  "vhs_time_rate": 315,
+  "vhs_bulk_discount_10h": 0.10,
+  "vhs_bulk_discount_20h": 0.20,
+
+  "smalfilm_min_rate": 75,
+  "smalfilm_start_per_rull": 95,
+
+  "usb_min_price": 295,
+
+  "policy": {
+    "no_flat_per_tape_price": true,
+    "vhs_pricing_unit": "per_time_hours",
+    "ask_duration_if_unknown": true,
+    "notes": [
+      "VHS prises pr time digitalisert video.",
+      "Be om estimert varighet hvis kunde ikke oppgir timer/minutter.",
+      "USB/minnepenn kommer i tillegg."
+    ]
+  },
+
+  "eksempler": {
+    "vhs": [
+      {
+        "beskrivelse": "3 timer total spilletid",
+        "utregning": "3 × 315",
+        "sum": 945
+      },
+      {
+        "beskrivelse": "12 timer total spilletid (10% rabatt)",
+        "utregning": "12 × 315 × 0.90",
+        "sum": 3402
+      }
+    ],
+    "smalfilm": [
+      {
+        "beskrivelse": "10 minutter + 1 rull startgebyr",
+        "utregning": "10 × 75 + 95",
+        "sum": 845
+      },
+      {
+        "beskrivelse": "30 minutter + 2 ruller startgebyr",
+        "utregning": "30 × 75 + 2 × 95",
+        "sum": 2590
+      }
+    ],
+    "tillegg": [
+      {
+        "beskrivelse": "USB/minnepenn (fra-pris)",
+        "sum": 295
+      }
+    ]
+  },
+
+  "forbehold": "Endelig pris avhenger av faktisk spilletid, antall ruller og eventuelle tillegg. Be om tilbud for nøyaktig pris."
 }
