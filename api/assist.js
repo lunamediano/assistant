@@ -7,7 +7,7 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 
-/* -------------------- Safe file helpers -------------------- */
+/* ---------------------- utils ---------------------- */
 function safeRead(file, kind = "text") {
   try {
     const raw = fs.readFileSync(file, "utf8");
@@ -18,8 +18,19 @@ function safeRead(file, kind = "text") {
     return null;
   }
 }
+function toInt(v, def = 0) {
+  const n = parseInt(String(v).replace(/[^\d-]/g, ""), 10);
+  return Number.isFinite(n) ? n : def;
+}
+function toNum(v, def = 0) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : def;
+}
+function nok(n) {
+  return toNum(n, 0).toLocaleString("no-NO");
+}
 
-/* -------------------- Load data -------------------- */
+/* ---------------------- load data ---------------------- */
 function loadData() {
   const faqCandidates = [
     path.join(__dirname, "..", "data", "faq.yaml"),
@@ -67,7 +78,7 @@ function loadData() {
   return { faq, prices, tried, loaded };
 }
 
-/* -------------------- FAQ-søk -------------------- */
+/* ---------------------- FAQ-søk ---------------------- */
 function normalize(s = "") {
   return (s + "")
     .toLowerCase()
@@ -109,108 +120,162 @@ function simpleSearch(userMessage, faqArray, minScore = 0.65) {
   return [];
 }
 
-/* -------------------- Utils for pris -------------------- */
-const fmt = (n) => Number(n).toLocaleString("no-NO");
-const toInt = (x) => {
-  if (x == null) return null;
-  const n = parseInt(String(x).replace(/\D+/g, ""), 10);
-  return Number.isFinite(n) ? n : null;
-};
-const toFloat = (x) => {
-  if (x == null) return null;
-  const n = parseFloat(String(x).replace(",", ".").replace(/[^\d.]/g, ""));
-  return Number.isFinite(n) ? n : null;
-};
-const round = (n) => Math.round(Number(n));
-
-/* -------------------- Intent: Smalfilm -------------------- */
-function parseSmalfilmIntent(msg) {
-  const m = msg.toLowerCase();
-  if (!/(smalfilm|super\s*8|8\s*mm)/.test(m)) return null;
-
-  // minutter / timer
-  let minutter = null;
-  const mMin = m.match(/(\d{1,4})\s*(min|minutt|minutter)/);
+/* ---------------------- Intent: Smalfilm ---------------------- */
+// Finn tall i tekst
+function extractMinutesFromText(s = "") {
+  const m = (s || "").toLowerCase();
+  const mMin   = m.match(/(\d{1,4})\s*(min|minutt|minutter)/);
   const mTimer = m.match(/(\d{1,2})\s*(t|time|timer)/);
-  if (mMin) minutter = toInt(mMin[1]);
-  else if (mTimer) minutter = toInt(mTimer[1]) * 60;
+  if (mMin)   return toInt(mMin[1]);
+  if (mTimer) return toInt(mTimer[1]) * 60;
+  return null;
+}
+function extractRullerFromText(s = "") {
+  const m = (s || "").toLowerCase().match(/(\d{1,3})\s*(rull|ruller)/);
+  return m ? toInt(m[1]) : null;
+}
+function minutesFromHistory(history = []) {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const n = extractMinutesFromText(history[i]?.content || "");
+    if (n != null) return n;
+  }
+  return null;
+}
+function rullerFromHistory(history = []) {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const n = extractRullerFromText(history[i]?.content || "");
+    if (n != null) return n;
+  }
+  return null;
+}
 
-  // ruller
-  const mRull = m.match(/(\d{1,3})\s*(rull|ruller)/);
-  const ruller = mRull ? toInt(mRull[1]) : null;
-
+function parseSmalfilmIntent(msg) {
+  const m = (msg || "").toLowerCase();
+  if (!/(smalfilm|super\s*8|super8|8\s*mm|8mm|16\s*mm|16mm)/.test(m)) return null;
+  const minutter = extractMinutesFromText(m);
+  const ruller   = extractRullerFromText(m);
   return { minutter, ruller };
 }
 
-function priceSmalfilm({ minutter, ruller }, prices) {
-  // riktig nøkkel-navn + fallback
-  const perMin   = toFloat(prices.smalfilm_per_minutt) ?? 75;
-  const startGeb = toFloat(prices.smalfilm_start_per_rull) ?? 95;
-  const usbMin   = toFloat(prices.usb_min_price || prices.minnepenn_min_price) ?? 295;
+function priceSmalfilm({ minutter, ruller }, prices, history) {
+  const perMin   = toNum(prices.smalfilm_min_rate ?? prices.smalfilm_per_minutt ?? 75);
+  const startGeb = toNum(prices.smalfilm_start_per_rull ?? 95);
+  const usbMin   = toNum(prices.usb_min_price ?? prices.minnepenn ?? 295);
+
+  // Fyll fra historikk dersom bare en av delene oppgis
+  if (minutter == null) minutter = minutesFromHistory(history);
+  if (ruller   == null) ruller   = rullerFromHistory(history);
 
   // Når minutter ikke oppgitt: forklar modell kort
   if (minutter == null) {
     return [
-      `Smalfilm prises med ca. ${fmt(perMin)} kr per minutt + ${fmt(startGeb)} kr i startgebyr per rull.`,
+      `Smalfilm prises med ca. ${perMin} kr per minutt + ${startGeb} kr i startgebyr per rull.`,
       `Vi gir 10% rabatt når det samlet er over 3 timer med film, og 20% rabatt over 6 timer med film.`,
-      `Oppgi gjerne antall minutter og ruller for et konkret prisestimat. USB/minnepenn kommer i tillegg (fra ${fmt(usbMin)} kr).`
+      `Oppgi gjerne antall minutter og ruller for et konkret prisestimat. USB/minnepenn kommer i tillegg (fra ${usbMin} kr).`
     ].join(" ");
   }
 
   const r = ruller ?? 1;
-  const grunn = minutter * perMin + r * startGeb;
+  const min = Math.max(0, toInt(minutter));
+  const base = min * perMin + r * startGeb;
 
-  // Rabattregler på minuttvolum
+  // Rabatt etter total spilletid
+  const timer = min / 60;
   let rabatt = 0;
-  if (minutter > 180 && minutter < 360) rabatt = 0.10;
-  if (minutter >= 360) rabatt = 0.20;
+  if (timer > 3) rabatt = 0.10;
+  if (timer >= 6) rabatt = 0.20;
 
-  const total = round(grunn * (1 - rabatt));
-  const deler = [
-    `For ${minutter} minutter smalfilm og ${r} rull er prisen ca ${fmt(total)} kr`,
-    rabatt ? `(inkl. ${Math.round(rabatt * 100)}% rabatt)` : "",
-    `.`
-  ].join(" ");
+  const total = Math.round(base * (1 - rabatt));
 
-  const tilleggsNotis = `USB/minnepenn kommer i tillegg (fra ${fmt(usbMin)} kr).`;
-  const rullHint = (ruller == null)
-    ? ` Hvis dette egentlig gjelder 2 ruller, øker totalen litt pga. startgebyret. Oppgi gjerne antall ruller for nøyaktig pris.`
-    : "";
-
-  return deler + rullHint + " " + tilleggsNotis;
+  let txt = `For ${min} minutter smalfilm og ${r} ${r === 1 ? "rull" : "ruller"} er prisen ca ${nok(total)} kr.`;
+  if (ruller == null) {
+    const base2 = min * perMin + 2 * startGeb;
+    const total2 = Math.round(base2 * (1 - rabatt));
+    txt += ` (Hvis dette gjelder 2 ruller, blir det ca ${nok(total2)} kr.)`;
+  }
+  if (rabatt > 0) {
+    txt += ` (Rabatt er inkludert: ${Math.round(rabatt * 100)}% for ${timer.toFixed(1)} timer totalt.)`;
+  }
+  txt += ` USB/minnepenn kommer i tillegg (fra ${usbMin} kr).`;
+  return txt;
 }
 
-/* -------------------- Intent: VHS (timer + rabatt) -------------------- */
+/* ---------------------- Intent: VHS ---------------------- */
 function parseVhsIntent(msg) {
-  const m = msg.toLowerCase();
-  if (!/(vhs|videokassett|videokassetter|video)/.test(m)) return null;
+  const m = (msg || "").toLowerCase();
+  if (!/(vhs|videokassett|videobånd|minidv|hi8|video8|vhsc)/.test(m)) return null;
 
-  // forsøk å hente timeantall (heltall)
-  const mTimer = m.match(/(\d{1,3})\s*(t|time|timer)/);
-  const timer = mTimer ? toInt(mTimer[1]) : null;
+  // Tid
+  let minutter = extractMinutesFromText(m);
+  // Antall kassetter (hvis kun antall oppgis)
+  const kMatch = m.match(/(\d{1,3})\s*(kassett|kassetter|bånd|videobånd)/);
+  const kassetter = kMatch ? toInt(kMatch[1]) : null;
 
-  return { timer };
+  return { minutter, kassetter };
 }
 
-function priceVhs({ timer }, prices) {
-  const perTime = toFloat(prices.vhs_per_time || prices.vhs_per_kassett /* legacy */) ?? 315;
+function priceVhs({ minutter, kassetter }, prices, history) {
+  const perTime = toNum(
+    prices.vhs_per_time ??
+    prices.video_per_time ??
+    prices.vhs_per_time_kr ??
+    315
+  );
+  const usbMin  = toNum(prices.usb_min_price ?? prices.minnepenn ?? 295);
 
-  if (timer == null) {
-    return `VHS prises per time digitalisert video (ca. ${fmt(perTime)} kr per time). Vi gir 10% rabatt over 10 timer og 20% rabatt over 20 timer. Oppgi gjerne antall timer for et estimat.`;
+  // Hvis minutter mangler: prøv husk fra historikk
+  if (minutter == null) minutter = minutesFromHistory(history);
+
+  // Har vi minutter ⇒ regn eksakt
+  if (minutter != null) {
+    const min = Math.max(0, toInt(minutter));
+    const timer = min / 60;
+
+    let rabatt = 0;
+    if (timer > 10) rabatt = 0.10;
+    if (timer >= 20) rabatt = 0.20;
+
+    const base = timer * perTime;
+    const total = Math.round(base * (1 - rabatt));
+
+    let txt = `Video prises pr time digitalisert opptak (${perTime} kr/time). For ${timer.toFixed(1)} timer blir prisen ca ${nok(total)} kr.`;
+    if (rabatt > 0) txt += ` (Inkluderer ${Math.round(rabatt * 100)}% rabatt.)`;
+    txt += ` USB/minnepenn kommer i tillegg (fra ${usbMin} kr).`;
+    return txt;
   }
 
-  // Rabatt: >10t =10%, ≥20t=20%
-  let rabatt = 0;
-  if (timer > 10 && timer < 20) rabatt = 0.10;
-  if (timer >= 20) rabatt = 0.20;
+  // Har vi bare antall kassetter ⇒ gi tryggt anslag + be om tid
+  if (kassetter != null) {
+    const k = toInt(kassetter);
+    // Anslå 60–120 min per kassett uten å love noe
+    const minLow  = k * 60;
+    const minHigh = k * 120;
+    const timeLow = minLow / 60;
+    const timeHigh = minHigh / 60;
 
-  const grunn = timer * perTime;
-  const total = round(grunn * (1 - rabatt));
+    const baseLow  = timeLow  * perTime;
+    const baseHigh = timeHigh * perTime;
 
-  return `For ca. ${timer} time(r) digitalisert video blir prisen rundt ${fmt(total)} kr${rabatt ? ` (inkl. ${Math.round(rabatt*100)}% rabatt)` : ""}.`;
+    // Rabatter i anslags-enden
+    const rabLow  = timeLow  > 10 ? (timeLow >= 20 ? 0.20 : 0.10) : 0;
+    const rabHigh = timeHigh > 10 ? (timeHigh >= 20 ? 0.20 : 0.10) : 0;
+
+    const totLow  = Math.round(baseLow  * (1 - rabLow));
+    const totHigh = Math.round(baseHigh * (1 - rabHigh));
+
+    return [
+      `Vi priser per time digitalisert video (${perTime} kr/time).`,
+      `Uten spilletid oppgitt kan ${k} ${k === 1 ? "kassett" : "kassetter"} typisk være mellom ${timeLow.toFixed(1)}–${timeHigh.toFixed(1)} timer`,
+      `⇒ ca ${nok(totLow)}–${nok(totHigh)} kr (inkl. ev. volumrabatt).`,
+      `Oppgi gjerne total spilletid for et mer presist estimat. USB/minnepenn i tillegg (fra ${usbMin} kr).`
+    ].join(" ");
+  }
+
+  // Ingen tid / ingen antall
+  return `Video prises pr time (${perTime} kr/time). Oppgi gjerne total spilletid (timer/minutter), så regner jeg et konkret estimat. USB/minnepenn i tillegg (fra ${usbMin} kr).`;
 }
 
-/* -------------------- Handler -------------------- */
+/* ---------------------- Handler ---------------------- */
 export default async function handler(req, res) {
   const allowed = (process.env.LUNA_ALLOWED_ORIGINS || "*")
     .split(",")
@@ -235,7 +300,7 @@ export default async function handler(req, res) {
       try { body = JSON.parse(body); } catch { body = {}; }
     }
     const message = (body.message || "").trim();
-    const history = Array.isArray(body.history) ? body.history : [];
+    const history = Array.isArray(body.history) ? body.history : []; // 👈 brukes for “hukommelse”
     const debug   = !!body.debug;
 
     if (!message) return res.status(400).json({ error: "Missing message" });
@@ -253,37 +318,38 @@ export default async function handler(req, res) {
       });
     }
 
-    // === 1) Intent: Smalfilm-pris ===
+    /* ---------- 1) FAQ først ---------- */
+    if (kbHits?.[0]?.a) {
+      const payload = { answer: kbHits[0].a, source: "FAQ" };
+      if (debug) payload._debug = { score: kbHits[0].score, matchedQuestion: kbHits[0].q, data: { tried, loaded, faqCount: faq.length, priceKeys: Object.keys(prices).length }};
+      return res.status(200).json(payload);
+    }
+
+    /* ---------- 2) Pris-intents (smalfilm / vhs) ---------- */
+    // Smalfilm
     const smIntent = parseSmalfilmIntent(message);
     if (smIntent) {
-      const ans = priceSmalfilm(smIntent, prices);
+      // bruk historikk for manglende felt
+      if (smIntent.minutter == null) smIntent.minutter = minutesFromHistory(history);
+      if (smIntent.ruller   == null) smIntent.ruller   = rullerFromHistory(history);
+
+      const ans = priceSmalfilm(smIntent, prices, history);
       const payload = { answer: ans, source: "AI" };
       if (debug) payload._debug = { intent: "smalfilm", smIntent, prices };
       return res.status(200).json(payload);
     }
 
-    // === 2) Intent: VHS-pris ===
+    // VHS
     const vhsIntent = parseVhsIntent(message);
     if (vhsIntent) {
-      const ans = priceVhs(vhsIntent, prices);
+      if (vhsIntent.minutter == null) vhsIntent.minutter = minutesFromHistory(history);
+      const ans = priceVhs(vhsIntent, prices, history);
       const payload = { answer: ans, source: "AI" };
       if (debug) payload._debug = { intent: "vhs", vhsIntent, prices };
       return res.status(200).json(payload);
     }
 
-    // === 3) FAQ ===
-    if (kbHits?.[0]?.a) {
-      const payload = { answer: kbHits[0].a, source: "FAQ" };
-      if (debug)
-        payload._debug = {
-          score: kbHits[0].score,
-          matchedQuestion: kbHits[0].q,
-          data: { tried, loaded, faqCount: faq.length, priceKeys: Object.keys(prices).length }
-        };
-      return res.status(200).json(payload);
-    }
-
-    // === 4) LLM fallback ===
+    /* ---------- 3) LLM fallback ---------- */
     const system = [
       'Du er "Luna" – en vennlig og presis AI-assistent for Luna Media (Vestfold).',
       "Svar kort på norsk. Bruk priseksempler og FAQ nedenfor når relevant.",
@@ -300,8 +366,9 @@ export default async function handler(req, res) {
     const user = `Kunde spør: ${message}
 Svar på norsk, maks 2–3 setninger.`;
 
-    let answer = "Beklager, jeg har ikke et godt svar på dette akkurat nå. " +
-                 "Send oss gjerne en e-post på kontakt@lunamedia.no eller ring 33 74 02 80.";
+    let answer =
+      "Beklager, jeg har ikke et godt svar på dette akkurat nå. " +
+      "Send oss gjerne en e-post på kontakt@lunamedia.no eller ring 33 74 02 80.";
 
     if (!OPENAI_API_KEY) {
       console.warn("Mangler OPENAI_API_KEY – fallback only.");
@@ -323,7 +390,7 @@ Svar på norsk, maks 2–3 setninger.`;
           max_tokens: 400,
           messages: [
             { role: "system", content: system },
-            ...history,
+            ...history, // 👈 ta med frontend-historikk
             { role: "user", content: user }
           ]
         })
