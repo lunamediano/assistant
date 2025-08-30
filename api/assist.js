@@ -92,22 +92,42 @@ function simpleSearch(userMessage, faqArray, minScore=0.65){
   return [];
 }
 
-/* --------------- price intents --------------- */
-// helpers to pull minutes / ruller from any text
+/* --------------- number words (no) --------------- */
+const NO_WORDNUM = {
+  "null":0,"en":1,"ett":1,"ei":1,"to":2,"tre":3,"fire":4,"fem":5,"seks":6,"sju":7,"syv":7,
+  "åtte":8,"ni":9,"ti":10,"elleve":11,"tolv":12,"tretten":13,"fjorten":14,"femten":15,
+  "seksten":16,"sytten":17,"atten":18,"nitten":19,"tjue":20
+};
+function wordToNum(w){
+  const k = (w||"").toLowerCase().normalize("NFKD").replace(/[^a-zæøå]/g,"");
+  return NO_WORDNUM.hasOwnProperty(k) ? NO_WORDNUM[k] : null;
+}
+
+/* --------------- extract helpers --------------- */
 function extractMinutes(text=""){
   const m = (text||"").toLowerCase();
-  const mm = m.match(/(\d{1,4})\s*(min|minutt|minutter)/);
-  const hh = m.match(/(\d{1,3})\s*(t|time|timer)/);
+  // digits
+  const mm = m.match(/(\d{1,4})\s*(min|minutt|minutter)\b/);
+  const hh = m.match(/(\d{1,3})\s*(t|time|timer)\b/);
   if (mm) return toInt(mm[1]);
   if (hh) return toInt(hh[1]) * 60;
+  // words
+  const wm = m.match(/([a-zæøå]+)\s*(min|minutt|minutter)\b/);
+  const wh = m.match(/([a-zæøå]+)\s*(t|time|timer)\b/);
+  if (wm){ const n = wordToNum(wm[1]); if(n!=null) return n; }
+  if (wh){ const n = wordToNum(wh[1]); if(n!=null) return n*60; }
   return null;
 }
 function extractRuller(text=""){
-  const m = (text||"").toLowerCase().match(/(\d{1,3})\s*(rull|ruller)/);
-  return m ? toInt(m[1]) : null;
+  const m = (text||"").toLowerCase();
+  const rd = m.match(/(\d{1,3})\s*(rull|ruller)\b/);
+  if (rd) return toInt(rd[1]);
+  const rw = m.match(/([a-zæøå]+)\s*(rull|ruller)\b/);
+  if (rw){ const n = wordToNum(rw[1]); if(n!=null) return n; }
+  return null;
 }
 
-// parse current message (loose)
+/* --------------- smalfilm parsing --------------- */
 function parseSmalfilmLoose(text=""){
   const m = text.toLowerCase();
   const hasFilm = /(smalfilm|super\s*8|super8|8\s*mm|8mm|16\s*mm|16mm)/.test(m);
@@ -116,11 +136,13 @@ function parseSmalfilmLoose(text=""){
   const ruller   = extractRuller(m);
   return { hasFilm, mentionsRullOnly, minutter, ruller };
 }
-// scan history to find last smalfilm context
+// only USER messages when mining context
 function historySmalfilm(history=[]){
   let ctx = { hasFilm:false, minutter:null, ruller:null };
-  for (let i = history.length-1; i>=0; i--){
-    const t = (history[i]?.content||"").toLowerCase();
+  for (let i=history.length-1; i>=0; i--){
+    const h = history[i];
+    if (h?.role !== "user") continue;
+    const t = (h.content||"").toLowerCase();
     const hasFilm = /(smalfilm|super\s*8|super8|8\s*mm|8mm|16\s*mm|16mm)/.test(t);
     const min = extractMinutes(t);
     const rul = extractRuller(t);
@@ -131,13 +153,21 @@ function historySmalfilm(history=[]){
   }
   return ctx;
 }
+function minutesFromUserHistory(history=[]){
+  for (let i=history.length-1; i>=0; i--){
+    const h=history[i]; if (h?.role!=="user") continue;
+    const n = extractMinutes(h?.content||"");
+    if (n != null) return n;
+  }
+  return null;
+}
 
+/* --------------- pricing --------------- */
 function smalfilmDiscount(totalMinutes){
   if (totalMinutes >= 360) return 0.20;   // ≥ 6 t
   if (totalMinutes >  180) return 0.10;   // > 3 t
   return 0;
 }
-
 function priceSmalfilm(minutter, ruller, prices){
   const perMin   = toNum(prices.smalfilm_min_rate ?? prices.smalfilm_per_minutt ?? 75);
   const startGeb = toNum(prices.smalfilm_start_per_rull ?? 95);
@@ -167,21 +197,14 @@ function priceSmalfilm(minutter, ruller, prices){
   return { answer: out, source: "Pris" };
 }
 
-// video (VHS/Hi8/Video8/MiniDV)
+// video
 function parseVideoIntent(text=""){
   const m = text.toLowerCase();
   if (!/(vhs|videokassett|videobånd|hi8|video8|minidv|vhsc)/.test(m)) return null;
   const minutter = extractMinutes(m);
-  const kMatch   = m.match(/(\d{1,3})\s*(kassett|kassetter|bånd|videobånd)/);
+  const kMatch   = m.match(/(\d{1,3})\s*(kassett|kassetter|bånd|videobånd)\b/);
   const kassetter= kMatch ? toInt(kMatch[1]) : null;
   return { minutter, kassetter };
-}
-function minutesFromHistory(history=[]){
-  for (let i = history.length-1; i>=0; i--){
-    const n = extractMinutes(history[i]?.content||"");
-    if (n != null) return n;
-  }
-  return null;
 }
 function priceVideo({minutter, kassetter}, prices){
   const perTime = toNum(
@@ -247,46 +270,37 @@ export default async function handler(req, res){
     const debug   = !!body.debug;
     if (!message) return res.status(400).json({ error:"Missing message" });
 
-    const { faq, prices, tried, loaded } = loadData();
-    if (debug){
-      console.log("DATA DEBUG — counts:", { faq:faq.length, priceKeys:Object.keys(prices||{}).length });
-    }
+    const { faq, prices } = loadData();
 
     // 1) FAQ
     const kbHits = simpleSearch(message, faq);
     if (kbHits?.[0]?.a) {
-      const payload = { answer: kbHits[0].a, source: "FAQ" };
-      if (debug) payload._debug = { score: kbHits[0].score, matchedQuestion: kbHits[0].q };
-      return res.status(200).json(payload);
+      return res.status(200).json({ answer: kbHits[0].a, source: "FAQ" });
     }
 
-    // 2) Price intents (context-aware)
-    // 2a) If message mentions a *video* format (incl. hi8/video8/minidv), go video path first
-    const videoIntent = parseVideoIntent(message);
-    if (videoIntent) {
-      // pull minutes from history if omitted
-      if (videoIntent.minutter == null) videoIntent.minutter = minutesFromHistory(history);
-      const out = priceVideo(videoIntent, prices);
-      if (debug) out._debug = { intent:"video", videoIntent };
-      return res.status(200).json(out);
+    // 2) Pris-intents
+    // video først hvis melding nevner videoformater (inkl. hi8/video8/minidv)
+    const vIntent = parseVideoIntent(message);
+    if (vIntent){
+      if (vIntent.minutter == null) vIntent.minutter = minutesFromUserHistory(history);
+      return res.status(200).json( priceVideo(vIntent, prices) );
     }
 
-    // 2b) Smalfilm with context
+    // smalfilm med kontekst
     const smNow  = parseSmalfilmLoose(message);
     const smHist = historySmalfilm(history);
     const shouldSmalfilm =
-      smNow.hasFilm
-      || (smNow.mentionsRullOnly && (smHist.hasFilm || smHist.minutter!=null));
+      smNow.hasFilm ||
+      (smNow.mentionsRullOnly && (smHist.hasFilm || smHist.minutter!=null));
 
     if (shouldSmalfilm){
       const minutter = smNow.minutter ?? smHist.minutter ?? null;
       const ruller   = smNow.ruller   ?? smHist.ruller   ?? null;
-      const out = priceSmalfilm(minutter, ruller, prices);
-      if (debug) out._debug = { intent:"smalfilm", smNow, smHist };
-      return res.status(200).json(out);
+      return res.status(200).json( priceSmalfilm(minutter, ruller, prices) );
     }
 
     // 3) LLM fallback
+    const { tried, loaded } = { tried:[], loaded:[] };
     const system = [
       'Du er "Luna" – en vennlig og presis AI-assistent for Luna Media (Vestfold).',
       "Svar kort på norsk. Bruk priseksempler og FAQ nedenfor når relevant.",
