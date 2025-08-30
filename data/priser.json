@@ -7,6 +7,7 @@
 
   "smalfilm_min_rate": 75,
   "smalfilm_start_per_rull": 95,
+  "smalfilm_default_ruller": 1,
 
   "usb_min_price": 295,
 
