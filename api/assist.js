@@ -78,161 +78,6 @@ function loadData() {
   return { faq, prices, tried, loaded };
 }
 
-// === PRICE INTENTS (smalfilm + VHS) =========================================
-
-// trygt heltall
-function intSafe(x){ const n = parseInt(String(x).replace(/\D+/g,''),10); return Number.isFinite(n)?n:null; }
-function formatNOK(n){ return n.toLocaleString("no-NO"); }
-// avrund til nærmeste 5-kroner for pene tall
-function round5(n){ return Math.round(n / 5) * 5; }
-
-// trekk ut minutter/ruller fra tekst
-function parseSmalfilmFromText(txt){
-  const m = (txt||"").toLowerCase();
-  const hasSmalfilm = /(smalfilm|super\s*8|8\s*mm|16\s*mm)/.test(m);
-  if(!hasSmalfilm) return null;
-  const min = m.match(/(\d{1,4})\s*(min|minutt|minutter)/);
-  const hr  = m.match(/(\d{1,3})\s*(t|timer)/);
-  const rolls = m.match(/(\d{1,3})\s*(rull|ruller)/);
-
-  let minutter = null;
-  if (hr) minutter = intSafe(hr[1]) * 60;
-  if (min && intSafe(min[1])!=null) minutter = intSafe(min[1]);
-
-  const ruller = rolls ? intSafe(rolls[1]) : null;
-  return { minutter, ruller };
-}
-
-// hent tidligere oppgitt kontekst fra history (siste som nevnte smalfilm)
-function extractSmalfilmFromHistory(history){
-  if(!Array.isArray(history)) return {};
-  for (let i = history.length - 1; i >= 0; i--){
-    const h = history[i];
-    if(!h?.content) continue;
-    const hit = parseSmalfilmFromText(h.content);
-    if(hit) return hit;
-  }
-  return {};
-}
-
-// rabatter for smalfilm basert på total minutter
-function smalfilmDiscount(totalMinutes){
-  if (totalMinutes >= 360) return 0.20; // ≥ 6 timer
-  if (totalMinutes >= 180) return 0.10; // ≥ 3 timer
-  return 0;
-}
-
-// beregn smalfilmpris
-function calcSmalfilmPrice({minutter, ruller}, priceMap){
-  const perMin   = intSafe(priceMap?.smalfilm_min_rate) ?? 75;
-  const startGeb = intSafe(priceMap?.smalfilm_start_per_rull) ?? 95;
-  const usbMin   = intSafe(priceMap?.usb_min_price) ?? 295;
-
-  const mins = intSafe(minutter);
-  const rolls = intSafe(ruller) ?? 1;
-
-  if (mins == null){
-    // forklar modell når minutter mangler
-    return {
-      text: [
-        `Smalfilm prises med ca. ${perMin} kr per minutt + ${startGeb} kr i startgebyr per rull.`,
-        `Vi gir 10% rabatt når samlet spilletid er over 3 timer, og 20% rabatt over 6 timer.`,
-        `Oppgi gjerne antall minutter og ruller for et konkret prisestimat. USB/minnepenn kommer i tillegg (fra ${usbMin} kr).`
-      ].join(" "),
-      source: "PRICE"
-    };
-  }
-
-  const disc = smalfilmDiscount(mins);
-  const arbeid = mins * perMin * (1 - disc);
-  const start = rolls * startGeb;
-  const total = round5(arbeid + start);
-
-  let parts = [`For ${mins} minutter smalfilm og ${rolls} rull${rolls>1?"er":""} er prisen ca ${formatNOK(total)} kr.`];
-  if (disc>0) parts.push(`(Rabatt er inkludert: ${(disc*100).toFixed(0)}% for ${(mins/60).toFixed(1)} timer totalt.)`);
-  parts.push(`USB/minnepenn kommer i tillegg (fra ${usbMin} kr).`);
-
-  return { text: parts.join(" "), source: "PRICE" };
-}
-
-// parse VHS (timer / antall kassetter)
-function parseVhsFromText(txt){
-  const m = (txt||"").toLowerCase();
-  if(!/(vhs|videokassett|videobånd)/.test(m)) return null;
-  const hours = m.match(/(\d{1,3})\s*(t|timer)/);
-  const tapes = m.match(/(\d{1,3})\s*(kassett|kassetter)/);
-  return { timer: hours ? intSafe(hours[1]) : null, kassetter: tapes ? intSafe(tapes[1]) : null };
-}
-function extractVhsFromHistory(history){
-  if(!Array.isArray(history)) return {};
-  for (let i = history.length - 1; i >= 0; i--){
-    const hit = parseVhsFromText(history[i]?.content||"");
-    if(hit) return hit;
-  }
-  return {};
-}
-function vhsDiscount(totalHours){
-  if (totalHours >= 20) return 0.20; // ≥20 timer
-  if (totalHours >= 10) return 0.10; // ≥10 timer
-  return 0;
-}
-function calcVhsPrice({timer, kassetter}, priceMap){
-  const perHour = intSafe(priceMap?.vhs_per_time) ?? 315;   // pris pr time digitalisert video
-  const usbMin  = intSafe(priceMap?.usb_min_price) ?? 295;
-
-  // hvis «kassetter» er oppgitt uten timer, pek kunden på time-prinsippet
-  if (timer == null && kassetter != null){
-    return {
-      text: `VHS prises per digitalisert time (ca. ${perHour} kr/time). Oppgi gjerne samlet spilletid for kassettene, så kan jeg beregne totalpris. USB/minnepenn kommer i tillegg (fra ${usbMin} kr).`,
-      source: "PRICE"
-    };
-  }
-  if (timer == null){
-    return {
-      text: `VHS prises per digitalisert time (ca. ${perHour} kr/time). Oppgi gjerne omtrent hvor mange timer opptak du har, så beregner jeg et prisestimat. USB/minnepenn fra ${usbMin} kr.`,
-      source: "PRICE"
-    };
-  }
-
-  const hrs = intSafe(timer);
-  const disc = vhsDiscount(hrs);
-  const total = round5(hrs * perHour * (1 - disc));
-  let msg = `For ${hrs} time${hrs!==1?"r":""} video blir prisen ca ${formatNOK(total)} kr.`;
-  if (disc>0) msg += ` (Rabatt inkludert: ${(disc*100).toFixed(0)}% over ${disc>=0.2?20:10} timer.)`;
-  msg += ` USB/minnepenn kommer i tillegg (fra ${usbMin} kr).`;
-  return { text: msg, source: "PRICE" };
-}
-
-// HOVED-SWITCH: Sjekk prisintents før FAQ/LLM
-(function maybeAnswerPriceIntent(){
-  const smNow = parseSmalfilmFromText(message);
-  const smHist = extractSmalfilmFromHistory(history);
-  const sm = smNow || (smHist.minutter || smHist.ruller ? { minutter: smHist.minutter ?? null, ruller: smHist.ruller ?? null } : null);
-
-  if (sm){
-    // hvis bruker kun sa «det er 16 ruller», behold minutter fra history
-    const merged = {
-      minutter: smNow?.minutter ?? smHist.minutter ?? null,
-      ruller:   smNow?.ruller   ?? smHist.ruller   ?? null
-    };
-    const out = calcSmalfilmPrice(merged, prices);
-    return res.status(200).json(out);
-  }
-
-  const vNow = parseVhsFromText(message);
-  const vHist = extractVhsFromHistory(history);
-  const vhs = vNow || (vHist.timer || vHist.kassetter ? { timer: vHist.timer ?? null, kassetter: vHist.kassetter ?? null } : null);
-
-  if (vhs){
-    const out = calcVhsPrice({
-      timer:     vNow?.timer ?? vHist.timer ?? null,
-      kassetter: vNow?.kassetter ?? vHist.kassetter ?? null
-    }, prices);
-    return res.status(200).json(out);
-  }
-})();
-
-
 /* ---------------------- FAQ-søk ---------------------- */
 function normalize(s = "") {
   return (s + "")
@@ -275,12 +120,18 @@ function simpleSearch(userMessage, faqArray, minScore = 0.65) {
   return [];
 }
 
-/* ---------------------- Intent: Smalfilm ---------------------- */
-// Finn tall i tekst
+/* ---------------------- Price helpers (shared) ---------------------- */
+// safe int
+function intSafe(x){ const n = parseInt(String(x).replace(/\D+/g,''),10); return Number.isFinite(n)?n:null; }
+// format/round
+function formatNOK(n){ return Number(n||0).toLocaleString("no-NO"); }
+function round5(n){ return Math.round(n / 5) * 5; }
+
+/* --------- Smalfilm intent + kalkulasjon --------- */
 function extractMinutesFromText(s = "") {
   const m = (s || "").toLowerCase();
   const mMin   = m.match(/(\d{1,4})\s*(min|minutt|minutter)/);
-  const mTimer = m.match(/(\d{1,2})\s*(t|time|timer)/);
+  const mTimer = m.match(/(\d{1,3})\s*(t|time|timer)/);
   if (mMin)   return toInt(mMin[1]);
   if (mTimer) return toInt(mTimer[1]) * 60;
   return null;
@@ -303,7 +154,6 @@ function rullerFromHistory(history = []) {
   }
   return null;
 }
-
 function parseSmalfilmIntent(msg) {
   const m = (msg || "").toLowerCase();
   if (!/(smalfilm|super\s*8|super8|8\s*mm|8mm|16\s*mm|16mm)/.test(m)) return null;
@@ -311,64 +161,62 @@ function parseSmalfilmIntent(msg) {
   const ruller   = extractRullerFromText(m);
   return { minutter, ruller };
 }
-
+function smalfilmDiscount(totalMinutes){
+  if (totalMinutes >= 360) return 0.20; // ≥ 6 timer
+  if (totalMinutes >= 180) return 0.10; // ≥ 3 timer
+  return 0;
+}
 function priceSmalfilm({ minutter, ruller }, prices, history) {
   const perMin   = toNum(prices.smalfilm_min_rate ?? prices.smalfilm_per_minutt ?? 75);
   const startGeb = toNum(prices.smalfilm_start_per_rull ?? 95);
   const usbMin   = toNum(prices.usb_min_price ?? prices.minnepenn ?? 295);
 
-  // Fyll fra historikk dersom bare en av delene oppgis
+  // Fyll fra historikk dersom bare én del er oppgitt
   if (minutter == null) minutter = minutesFromHistory(history);
   if (ruller   == null) ruller   = rullerFromHistory(history);
 
-  // Når minutter ikke oppgitt: forklar modell kort
   if (minutter == null) {
     return [
       `Smalfilm prises med ca. ${perMin} kr per minutt + ${startGeb} kr i startgebyr per rull.`,
-      `Vi gir 10% rabatt når det samlet er over 3 timer med film, og 20% rabatt over 6 timer med film.`,
+      `Vi gir 10% rabatt når samlet spilletid er over 3 timer, og 20% rabatt over 6 timer.`,
       `Oppgi gjerne antall minutter og ruller for et konkret prisestimat. USB/minnepenn kommer i tillegg (fra ${usbMin} kr).`
     ].join(" ");
   }
 
-  const r = ruller ?? 1;
   const min = Math.max(0, toInt(minutter));
-  const base = min * perMin + r * startGeb;
+  const rolls = ruller ?? 1;
+  const disc = smalfilmDiscount(min);
 
-  // Rabatt etter total spilletid
-  const timer = min / 60;
-  let rabatt = 0;
-  if (timer > 3) rabatt = 0.10;
-  if (timer >= 6) rabatt = 0.20;
+  const arbeid = min * perMin * (1 - disc);
+  const start  = rolls * startGeb;
+  const total  = round5(arbeid + start);
 
-  const total = Math.round(base * (1 - rabatt));
-
-  let txt = `For ${min} minutter smalfilm og ${r} ${r === 1 ? "rull" : "ruller"} er prisen ca ${nok(total)} kr.`;
+  let txt = `For ${min} minutter smalfilm og ${rolls} ${rolls === 1 ? "rull" : "ruller"} er prisen ca ${formatNOK(total)} kr.`;
   if (ruller == null) {
-    const base2 = min * perMin + 2 * startGeb;
-    const total2 = Math.round(base2 * (1 - rabatt));
-    txt += ` (Hvis dette gjelder 2 ruller, blir det ca ${nok(total2)} kr.)`;
+    const altTotal = round5(min * perMin * (1 - disc) + 2 * startGeb);
+    txt += ` (Hvis dette gjelder 2 ruller, blir det ca ${formatNOK(altTotal)} kr.)`;
   }
-  if (rabatt > 0) {
-    txt += ` (Rabatt er inkludert: ${Math.round(rabatt * 100)}% for ${timer.toFixed(1)} timer totalt.)`;
+  if (disc > 0) {
+    txt += ` (Rabatt er inkludert: ${Math.round(disc * 100)}% for ${(min/60).toFixed(1)} timer totalt.)`;
   }
   txt += ` USB/minnepenn kommer i tillegg (fra ${usbMin} kr).`;
   return txt;
 }
 
-/* ---------------------- Intent: VHS ---------------------- */
+/* --------- VHS intent + kalkulasjon --------- */
 function parseVhsIntent(msg) {
   const m = (msg || "").toLowerCase();
   if (!/(vhs|videokassett|videobånd|minidv|hi8|video8|vhsc)/.test(m)) return null;
-
-  // Tid
   let minutter = extractMinutesFromText(m);
-  // Antall kassetter (hvis kun antall oppgis)
   const kMatch = m.match(/(\d{1,3})\s*(kassett|kassetter|bånd|videobånd)/);
   const kassetter = kMatch ? toInt(kMatch[1]) : null;
-
   return { minutter, kassetter };
 }
-
+function vhsDiscount(totalHours){
+  if (totalHours >= 20) return 0.20;
+  if (totalHours >= 10) return 0.10;
+  return 0;
+}
 function priceVhs({ minutter, kassetter }, prices, history) {
   const perTime = toNum(
     prices.vhs_per_time ??
@@ -378,55 +226,35 @@ function priceVhs({ minutter, kassetter }, prices, history) {
   );
   const usbMin  = toNum(prices.usb_min_price ?? prices.minnepenn ?? 295);
 
-  // Hvis minutter mangler: prøv husk fra historikk
   if (minutter == null) minutter = minutesFromHistory(history);
 
-  // Har vi minutter ⇒ regn eksakt
   if (minutter != null) {
     const min = Math.max(0, toInt(minutter));
     const timer = min / 60;
-
-    let rabatt = 0;
-    if (timer > 10) rabatt = 0.10;
-    if (timer >= 20) rabatt = 0.20;
-
-    const base = timer * perTime;
-    const total = Math.round(base * (1 - rabatt));
-
-    let txt = `Video prises pr time digitalisert opptak (${perTime} kr/time). For ${timer.toFixed(1)} timer blir prisen ca ${nok(total)} kr.`;
-    if (rabatt > 0) txt += ` (Inkluderer ${Math.round(rabatt * 100)}% rabatt.)`;
+    const disc = vhsDiscount(timer);
+    const total = round5(timer * perTime * (1 - disc));
+    let txt = `Video prises pr time digitalisert opptak (${perTime} kr/time). For ${timer.toFixed(1)} timer blir prisen ca ${formatNOK(total)} kr.`;
+    if (disc > 0) txt += ` (Inkluderer ${Math.round(disc * 100)}% rabatt.)`;
     txt += ` USB/minnepenn kommer i tillegg (fra ${usbMin} kr).`;
     return txt;
   }
 
-  // Har vi bare antall kassetter ⇒ gi tryggt anslag + be om tid
   if (kassetter != null) {
     const k = toInt(kassetter);
-    // Anslå 60–120 min per kassett uten å love noe
-    const minLow  = k * 60;
-    const minHigh = k * 120;
-    const timeLow = minLow / 60;
-    const timeHigh = minHigh / 60;
-
-    const baseLow  = timeLow  * perTime;
-    const baseHigh = timeHigh * perTime;
-
-    // Rabatter i anslags-enden
-    const rabLow  = timeLow  > 10 ? (timeLow >= 20 ? 0.20 : 0.10) : 0;
-    const rabHigh = timeHigh > 10 ? (timeHigh >= 20 ? 0.20 : 0.10) : 0;
-
-    const totLow  = Math.round(baseLow  * (1 - rabLow));
-    const totHigh = Math.round(baseHigh * (1 - rabHigh));
-
+    const timeLow  = (k * 60) / 60;
+    const timeHigh = (k * 120) / 60;
+    const discLow  = vhsDiscount(timeLow);
+    const discHigh = vhsDiscount(timeHigh);
+    const totLow   = round5(timeLow  * perTime * (1 - discLow));
+    const totHigh  = round5(timeHigh * perTime * (1 - discHigh));
     return [
       `Vi priser per time digitalisert video (${perTime} kr/time).`,
-      `Uten spilletid oppgitt kan ${k} ${k === 1 ? "kassett" : "kassetter"} typisk være mellom ${timeLow.toFixed(1)}–${timeHigh.toFixed(1)} timer`,
-      `⇒ ca ${nok(totLow)}–${nok(totHigh)} kr (inkl. ev. volumrabatt).`,
+      `${k} ${k===1?"kassett":"kassetter"} kan typisk være ${timeLow.toFixed(1)}–${timeHigh.toFixed(1)} timer`,
+      `⇒ ca ${formatNOK(totLow)}–${formatNOK(totHigh)} kr (inkl. ev. volumrabatt).`,
       `Oppgi gjerne total spilletid for et mer presist estimat. USB/minnepenn i tillegg (fra ${usbMin} kr).`
     ].join(" ");
   }
 
-  // Ingen tid / ingen antall
   return `Video prises pr time (${perTime} kr/time). Oppgi gjerne total spilletid (timer/minutter), så regner jeg et konkret estimat. USB/minnepenn i tillegg (fra ${usbMin} kr).`;
 }
 
@@ -455,7 +283,7 @@ export default async function handler(req, res) {
       try { body = JSON.parse(body); } catch { body = {}; }
     }
     const message = (body.message || "").trim();
-    const history = Array.isArray(body.history) ? body.history : []; // 👈 brukes for “hukommelse”
+    const history = Array.isArray(body.history) ? body.history : [];
     const debug   = !!body.debug;
 
     if (!message) return res.status(400).json({ error: "Missing message" });
@@ -473,34 +301,26 @@ export default async function handler(req, res) {
       });
     }
 
-    /* ---------- 1) FAQ først ---------- */
-    if (kbHits?.[0]?.a) {
-      const payload = { answer: kbHits[0].a, source: "FAQ" };
-      if (debug) payload._debug = { score: kbHits[0].score, matchedQuestion: kbHits[0].q, data: { tried, loaded, faqCount: faq.length, priceKeys: Object.keys(prices).length }};
-      return res.status(200).json(payload);
-    }
-
-    /* ---------- 2) Pris-intents (smalfilm / vhs) ---------- */
-    // Smalfilm
+    /* ---------- 1) Pris-intents (før FAQ/LLM) ---------- */
     const smIntent = parseSmalfilmIntent(message);
     if (smIntent) {
-      // bruk historikk for manglende felt
-      if (smIntent.minutter == null) smIntent.minutter = minutesFromHistory(history);
-      if (smIntent.ruller   == null) smIntent.ruller   = rullerFromHistory(history);
-
       const ans = priceSmalfilm(smIntent, prices, history);
       const payload = { answer: ans, source: "AI" };
       if (debug) payload._debug = { intent: "smalfilm", smIntent, prices };
       return res.status(200).json(payload);
     }
-
-    // VHS
     const vhsIntent = parseVhsIntent(message);
     if (vhsIntent) {
-      if (vhsIntent.minutter == null) vhsIntent.minutter = minutesFromHistory(history);
       const ans = priceVhs(vhsIntent, prices, history);
       const payload = { answer: ans, source: "AI" };
       if (debug) payload._debug = { intent: "vhs", vhsIntent, prices };
+      return res.status(200).json(payload);
+    }
+
+    /* ---------- 2) FAQ ---------- */
+    if (kbHits?.[0]?.a) {
+      const payload = { answer: kbHits[0].a, source: "FAQ" };
+      if (debug) payload._debug = { score: kbHits[0].score, matchedQuestion: kbHits[0].q, data: { tried, loaded, faqCount: faq.length, priceKeys: Object.keys(prices).length }};
       return res.status(200).json(payload);
     }
 
@@ -545,7 +365,7 @@ Svar på norsk, maks 2–3 setninger.`;
           max_tokens: 400,
           messages: [
             { role: "system", content: system },
-            ...history, // 👈 ta med frontend-historikk
+            ...history,
             { role: "user", content: user }
           ]
         })
