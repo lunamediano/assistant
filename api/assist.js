@@ -317,21 +317,43 @@ export default async function handler(req, res) {
       });
     }
 
-    /* ---------- 1) Pris-intents (før FAQ/LLM) ---------- */
-    const smIntent = parseSmalfilmIntent(message);
-    if (smIntent) {
-      const ans = priceSmalfilm(smIntent, prices, history);
-      const payload = { answer: ans, source: "AI" };
-      if (debug) payload._debug = { intent: "smalfilm", smIntent, prices };
-      return res.status(200).json(payload);
-    }
-    const vhsIntent = parseVhsIntent(message);
-    if (vhsIntent) {
-      const ans = priceVhs(vhsIntent, prices, history);
-      const payload = { answer: ans, source: "AI" };
-      if (debug) payload._debug = { intent: "vhs", vhsIntent, prices };
-      return res.status(200).json(payload);
-    }
+/* ---------- 1) Pris-intents (før FAQ/LLM) ---------- */
+// Smalfilm
+let smIntent = parseSmalfilmIntent(message);
+
+// Hvis meldingen bare sier "X ruller" men historikken viser smalfilm,
+// bygg en intent av ruller + minutter fra historikk:
+if (!smIntent) {
+  const rOnly = extractRullerOnly(message);
+  if (rOnly != null && (hasSmalfilmContext(history) || minutesFromHistory(history) != null)) {
+    smIntent = { minutter: minutesFromHistory(history), ruller: rOnly };
+  }
+}
+
+if (smIntent) {
+  // Merge alltid med historikk for manglende felt
+  const merged = {
+    minutter: smIntent.minutter ?? minutesFromHistory(history),
+    ruller:   smIntent.ruller   ?? rullerFromHistory(history) ?? 1
+  };
+  const ans = priceSmalfilm(merged, prices, history);
+  return res.status(200).json({ answer: ans, source: "PRICE" });
+}
+
+// VHS
+const vhsIntent = parseVhsIntent(message);
+if (vhsIntent) {
+  const ans = priceVhs(
+    {
+      minutter: vhsIntent.minutter ?? minutesFromHistory(history),
+      kassetter: vhsIntent.kassetter
+    },
+    prices,
+    history
+  );
+  return res.status(200).json({ answer: ans, source: "PRICE" });
+}
+
 
     /* ---------- 2) FAQ ---------- */
     if (kbHits?.[0]?.a) {
