@@ -181,6 +181,46 @@ Svar på norsk, maks 2–3 setninger.`;
     let answer = "Beklager, jeg har ikke et godt svar på dette akkurat nå. " +
                  "Send oss gjerne en e-post på kontakt@lunamedia.no eller ring 33 74 02 80.";
 
+// ---- Quick price intent for smalfilm ----
+function parseIntSafe(s){ const n = parseInt(s,10); return Number.isFinite(n) ? n : null; }
+
+function parseSmalfilmIntent(msg){
+  const m = msg.toLowerCase();
+  if (!/(smalfilm|super\s*8|8\s*mm)/.test(m)) return null;
+  const minMatch = m.match(/(\d{1,4})\s*(min|minutter)/);
+  const rullMatch = m.match(/(\d{1,3})\s*(rull|ruller)/);
+  const minutter = minMatch ? parseIntSafe(minMatch[1]) : null;
+  const ruller   = rullMatch ? parseIntSafe(rullMatch[1]) : null;
+  return { minutter, ruller };
+}
+
+function smalfilmPriceText(minutter, ruller, prices){
+  const perMin   = prices.smalfilm_min_rate || 75;
+  const startGeb = prices.smalfilm_start_per_rull || 95;
+  const usbMin   = prices.usb_min_price || 295;
+
+  const r1 = ruller ?? (prices.smalfilm_default_ruller || 1);
+  const base = (minutter ?? 0) * perMin + r1 * startGeb;
+
+  let txt = `For ${minutter ?? "ukjent antall"} minutter smalfilm `;
+  if (minutter == null){
+    txt += `beregnes prisen som ${perMin} kr per minutt + ${startGeb} kr i startgebyr per rull.`;
+  } else {
+    txt += `med ${r1} rull blir prisen ca ${base.toLocaleString("no-NO")} kr.`;
+  }
+
+  // Hvis ruller ikke spesifisert og vi har minutter: vis også eksempel med 2 ruller, for å unngå at vi «gjetter» for høyt/lavt.
+  if (minutter != null && ruller == null){
+    const base2 = (minutter * perMin) + (2 * startGeb);
+    txt += ` Hvis dette gjelder 2 ruller, blir det ca ${base2.toLocaleString("no-NO")} kr.`;
+    txt += ` (Oppgi gjerne antall ruller for helt nøyaktig pris.)`;
+  }
+
+  txt += ` Husk at USB/minnepenn kommer i tillegg, fra ${usbMin} kr.`;
+  return txt;
+}
+
+
     if (!OPENAI_API_KEY) {
       console.warn("Mangler OPENAI_API_KEY – fallback only.");
       const payload = { answer, source: "fallback_no_key" };
