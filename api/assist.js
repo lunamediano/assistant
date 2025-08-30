@@ -121,6 +121,22 @@ function simpleSearch(userMessage, faqArray, minScore = 0.65) {
 }
 
 /* ---------------------- Price helpers (shared) ---------------------- */
+
+// Sjekk om historikken handler om smalfilm
+function hasSmalfilmContext(history = []) {
+  const re = /(smalfilm|super\s*8|super8|8\s*mm|8mm|16\s*mm|16mm)/i;
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (re.test(history[i]?.content || "")) return true;
+  }
+  return false;
+}
+
+// Finn "ruller" i en tekst (uten å kreve "smalfilm")
+function extractRullerOnly(text = "") {
+  const m = (text || "").toLowerCase().match(/(\d{1,3})\s*(rull|ruller)/);
+  return m ? toInt(m[1]) : null;
+}
+
 // safe int
 function intSafe(x){ const n = parseInt(String(x).replace(/\D+/g,''),10); return Number.isFinite(n)?n:null; }
 // format/round
