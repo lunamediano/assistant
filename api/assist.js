@@ -33,6 +33,27 @@ function hasAnyWord(m = "", words = []) {
   return words.some(w => s.includes(w));
 }
 
+// --- smalfilm-kontekst og lengde-ord ---
+function smalfilmInText(s=""){
+  const m = (s||"").toLowerCase();
+  return /(smalfilm|super\s*8|super8|8\s*mm|8mm|16\s*mm|16mm)/.test(m);
+}
+function hasLengthWords(s=""){
+  const m = (s||"").toLowerCase();
+  return /(lengde|hvor.*(lang|mye).*(film|minutt)|minutt|beregn|anslå|estim)/.test(m);
+}
+function inSmalfilmContext(history=[]){
+  // se på siste 6 brukermeldinger
+  let hits = 0;
+  for (let i = history.length - 1; i >= 0 && hits < 2; i--){
+    const h = history[i];
+    if (h?.role !== "user") continue;
+    if (smalfilmInText(h?.content||"")) { hits++; if (hits>=1) break; }
+  }
+  return hits > 0;
+}
+
+
 /* =============== Load data =============== */
 function loadData() {
   const faqCandidates = [
@@ -215,38 +236,53 @@ function estFromMeters(meters, type = null) {
   if (type === "super8")return { minutes: row.minS8, label: "Super 8" };
   return { rangeText: `ca. ${row.min8} min (8mm) eller ca. ${row.minS8} min (Super 8)` };
 }
-// Oppdag “spole”/“cm”/“meter” i tekst og svar med anslag
-function handleSmalfilmLengthIntent(message) {
+// Oppdag “spole/diameter/meter” ELLER tidligere smalfilm-prat + lengdespørsmål
+function handleSmalfilmLengthIntent(message, history){
   const m = (message || "").toLowerCase();
-  if (!/(spol|diameter|cm|meter|m)\b/.test(m)) return null;
-  if (!/(smalfilm|super\s*8|super8|8\s*mm|8mm)/.test(m)) return null;
 
+  const mentionsFilm = smalfilmInText(m) || inSmalfilmContext(history);
+  const mentionsLen  = hasLengthWords(m) || /(spol|diameter|cm|meter|m)\b/.test(m);
+  if (!mentionsFilm || !mentionsLen) return null;
+
+  // Eksplisitte tall?
   const cmMatch = m.match(/(\d{1,2}(?:[.,]\d)?)\s*cm/);
   const mMatch  = m.match(/(\d{1,3})\s*(?:m|meter)\b/);
   const isS8    = /(super\s*8|super8)/.test(m);
   const is8     = /(8\s*mm|8mm)/.test(m) && !isS8;
 
-  let est = null;
-  if (cmMatch) {
-    const d = parseFloat(cmMatch[1].replace(",", "."));
-    est = estFromDiameter(d, isS8 ? "super8" : (is8 ? "8mm" : null));
-  } else if (mMatch) {
-    const meters = toInt(mMatch[1]);
-    est = estFromMeters(meters, isS8 ? "super8" : (is8 ? "8mm" : null));
-  }
-  if (!est) return null;
+  // Har vi konkrete mål? → beregn
+  if (cmMatch || mMatch){
+    let est;
+    if (cmMatch){
+      const d = parseFloat(cmMatch[1].replace(",", "."));
+      est = estFromDiameter(d, isS8 ? "super8" : (is8 ? "8mm" : null));
+    } else {
+      const meters = toInt(mMatch[1]);
+      est = estFromMeters(meters, isS8 ? "super8" : (is8 ? "8mm" : null));
+    }
+    if (!est) return null;
 
-  if (est.minutes) {
+    if (est.minutes){
+      return {
+        answer: `Det tilsvarer omtrent ${est.minutes} minutter ${est.label}. Oppgi gjerne hvor mange slike spoler du har, så kan jeg anslå total spilletid og pris.`,
+        source: "Info"
+      };
+    }
     return {
-      answer: `Det tilsvarer omtrent ${est.minutes} minutter ${est.label}. Oppgi gjerne totalt antall spoler, så kan jeg anslå samlet spilletid eller pris.`,
+      answer: `Det tilsvarer ${est.rangeText}. Si gjerne om det er 8mm eller Super 8 – og hvor mange spoler – så regner jeg total tid og pris.`,
       source: "Info"
     };
   }
-  return {
-    answer: `Dette tilsvarer ${est.rangeText}. Hvis du vet om det er 8mm eller Super 8, kan jeg beregne mer presist – eller gi et prisestimat.`,
-    source: "Info"
-  };
+
+  // Ingen cm/meter oppgitt → gi tydelig veiledning
+  const ask = [
+    "Jeg kan hjelpe deg å anslå spilletid per spole.",
+    "Fortell enten **diameteren på spolen** (for eksempel 7,5 cm / 12,7 cm / 14,5 cm / 17 cm) eller **omtrent hvor mange meter** film som står på.",
+    "Si også om det er **8mm** eller **Super 8** (hvis du vet det). Eksempel: «12,7 cm, Super 8, 16 spoler».",
+  ].join("\n");
+  return { answer: ask, source: "Info" };
 }
+
 
 /* =============== Prisregler =============== */
 // Smalfilm rabatt
@@ -609,7 +645,7 @@ export default async function handler(req, res) {
     if (delv) return res.status(200).json(delv);
 
     // 4) Spole/diameter → minutter (hjelpeanslag)
-    const spool = handleSmalfilmLengthIntent(message);
+    const spool = handleSmalfilmLengthIntent(message, history);
     if (spool) return res.status(200).json(spool);
 
     // 5) Purchase intent
