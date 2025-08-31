@@ -1,11 +1,10 @@
 {
   "name": "luna-media-assistant",
   "version": "1.0.0",
-  "type": "module",
   "private": true,
-  "dependencies": { "js-yaml": "^4.1.0" }
+  "type": "module",
+  "dependencies": {
     "js-yaml": "^4.1.0",
     "resend": "^3.0.0"
-
   }
 }
