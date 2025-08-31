@@ -3,8 +3,9 @@
   "version": "1.0.0",
   "type": "module",
   "private": true,
-  "dependencies": {
+  "dependencies": { "js-yaml": "^4.1.0" }
     "js-yaml": "^4.1.0",
     "resend": "^3.0.0"
+
   }
 }
