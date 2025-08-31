@@ -126,9 +126,26 @@ function minutesFromUserHistory(history=[]){
 }
 
 /* ============== smalfilm kontekst ================== */
+// 🔧 inkluder S8/S-8 som Super 8, og dobbel-8-varianter
+function smalfilmInText(s=""){
+  const m = (s || "").toLowerCase();
+  return /(smalfilm|super\s*8|super8|s-?8|8\s*mm|8mm|dobbel[-\s]?8|double[-\s]?8|16\s*mm|16mm)/.test(m);
+}
+// 🔧 sjekk både bruker- og assistentmeldinger (siste 8) for smalfilm-kontekst
+function inSmalfilmContext(history=[]){
+  if (!Array.isArray(history)) return false;
+  const start = Math.max(0, history.length - 8);
+  for (let i = history.length - 1; i >= start; i--){
+    const h = history[i];
+    const txt = h?.content || "";
+    if (smalfilmInText(txt)) return true;
+  }
+  return false;
+}
+
 function parseSmalfilmLoose(text=""){
   const m = text.toLowerCase();
-  const hasFilm = /(smalfilm|super\s*8|super8|8\s*mm|8mm|16\s*mm|16mm|dobbel[-\s]?8|double[-\s]?8)/.test(m);
+  const hasFilm = smalfilmInText(m);
   const mentionsRullOnly = /(rull|ruller)/.test(m);
   const minutter = extractMinutes(m);
   const ruller   = extractRuller(m);
@@ -138,9 +155,9 @@ function historySmalfilm(history=[]){
   let ctx = { hasFilm:false, minutter:null, ruller:null };
   for (let i=history.length-1; i>=0; i--){
     const h = history[i];
-    if (h?.role !== "user") continue;
+    if (!h?.content) continue;
     const t = (h.content||"").toLowerCase();
-    const hasFilm = /(smalfilm|super\s*8|super8|8\s*mm|8mm|16\s*mm|16mm)/.test(t);
+    const hasFilm = smalfilmInText(t);
     const min = extractMinutes(t);
     const rul = extractRuller(t);
     if (hasFilm) ctx.hasFilm = true;
@@ -382,18 +399,6 @@ async function handleBookingIntent(message, history){
 }
 
 /* ======== Smalfilm-lengde intent (diameter/meter) ======== */
-function smalfilmInText(s=""){
-  const m = (s || "").toLowerCase();
-  return /(smalfilm|super\s*8|super8|8\s*mm|8mm|dobbel[-\s]?8|double[-\s]?8|16\s*mm|16mm)/.test(m);
-}
-function inSmalfilmContext(history=[]){
-  for (let i = history.length - 1; i >= 0; i--){
-    const h = history[i];
-    if (h?.role !== "user") continue;
-    if (smalfilmInText(h.content||"")) return true;
-  }
-  return false;
-}
 function hasLengthWords(s=""){
   const m = (s || "").toLowerCase();
   return /(lengde|lang|min|minutt|minutter|time|timer|cm|meter|m|spol|spole|diameter)/.test(m);
@@ -447,7 +452,7 @@ function handleSmalfilmLengthIntent(message, history){
   const mentionsRuller = /(rull|ruller)\b/.test(m);
   if (!mentionsFilm || !(mentionsLen || mentionsRuller)) return null;
 
-  const isS8 = /(super\s*8|super8)/.test(m);
+  const isS8 = /(super\s*8|super8|s-?8)/.test(m);
   const is8  = /(8\s*mm|8mm)/.test(m) && !isS8;
   const format = isS8 ? "super8" : (is8 ? "8mm" : null);
 
@@ -548,7 +553,7 @@ export default async function handler(req, res){
     const bookingHit = await handleBookingIntent(message, history);
     if (bookingHit) return res.status(200).json(bookingHit);
 
-    // 6) LLM fallback (med menneskelig-overtakelse-hint ved filming)
+    // 6) LLM fallback
     const system = [
       'Du er "Luna" – en vennlig og presis AI-assistent for Luna Media (Vestfold).',
       "Svar kort på norsk. Bruk priseksempler og FAQ når relevant.",
