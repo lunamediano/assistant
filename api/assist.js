@@ -49,7 +49,6 @@ function looksLikeBooking(msg) {
   const m = (msg || "").toLowerCase();
   return BOOKING_KEYWORDS.some(k => m.includes(k));
 }
-// trekkere – vi henter detaljene stegvis fra melding + historikk
 function extractEmail(s=""){ const m=(s.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi)||[]); return m[0]||null; }
 function extractDate(s=""){
   const m = (s||"").toLowerCase()
@@ -197,24 +196,63 @@ function extractRuller(text=""){
 /* --------------- smalfilm parsing --------------- */
 function parseSmalfilmLoose(text=""){
   const m = text.toLowerCase();
-  const hasFilm = /(smalfilm|super\s*8|super8|8\s*mm|8mm|16\s*mm|16mm)/.test(m);
+  const hasFilm = /(smalfilm|super\s*8|super8|8\s*mm|8mm|16\s*mm|16mm)\b/.test(m);
   const mentionsRullOnly = /(rull|ruller)\b/.test(m);
+
+  const gauge16 = /(16\s*mm|16mm)\b/.test(m);
+  const gaugeS8 = /(super\s*8|super8)\b/.test(m);
+  const gauge8  = /(8\s*mm|8mm)\b/.test(m) && !gaugeS8;
+
+  const soundOptical  = /(optisk lyd|optisk)\b/.test(m);
+  const soundMagnetic = /(magnetisk lyd|magnetlyd|magnetisk)\b/.test(m);
+  const soundGeneric  = /\blyd\b/.test(m);
+
   const minutter = extractMinutes(m);
   const ruller   = extractRuller(m);
-  return { hasFilm, mentionsRullOnly, minutter, ruller };
+
+  let gauge = null;
+  if (gauge16) gauge = "16mm";
+  else if (gaugeS8) gauge = "super8";
+  else if (gauge8) gauge = "8mm";
+
+  let sound = null;
+  if (soundOptical) sound = "optisk";
+  else if (soundMagnetic) sound = "magnetisk";
+  else if (soundGeneric) sound = "ja";
+
+  return { hasFilm, mentionsRullOnly, minutter, ruller, gauge, sound };
 }
 function historySmalfilm(history=[]){
-  let ctx = { hasFilm:false, minutter:null, ruller:null };
+  let ctx = { hasFilm:false, minutter:null, ruller:null, gauge:null, sound:null };
   for (let i=history.length-1; i>=0; i--){
     const h = history[i];
     if (h?.role !== "user") continue;
     const t = (h.content||"").toLowerCase();
-    const hasFilm = /(smalfilm|super\s*8|super8|8\s*mm|8mm|16\s*mm|16mm)/.test(t);
+    const hasFilm = /(smalfilm|super\s*8|super8|8\s*mm|8mm|16\s*mm|16mm)\b/.test(t);
     const min = extractMinutes(t);
     const rul = extractRuller(t);
+
+    const gauge16 = /(16\s*mm|16mm)\b/.test(t);
+    const gaugeS8 = /(super\s*8|super8)\b/.test(t);
+    const gauge8  = /(8\s*mm|8mm)\b/.test(t) && !gaugeS8;
+
+    const soundOptical  = /(optisk lyd|optisk)\b/.test(t);
+    const soundMagnetic = /(magnetisk lyd|magnetlyd|magnetisk)\b/.test(t);
+    const soundGeneric  = /\blyd\b/.test(t);
+
     if (hasFilm) ctx.hasFilm = true;
     if (min != null && ctx.minutter == null) ctx.minutter = min;
     if (rul != null && ctx.ruller   == null) ctx.ruller   = rul;
+    if (!ctx.gauge) {
+      if (gauge16) ctx.gauge = "16mm";
+      else if (gaugeS8) ctx.gauge = "super8";
+      else if (gauge8)  ctx.gauge = "8mm";
+    }
+    if (!ctx.sound) {
+      if (soundOptical) ctx.sound = "optisk";
+      else if (soundMagnetic) ctx.sound = "magnetisk";
+      else if (soundGeneric) ctx.sound = "ja";
+    }
     if (ctx.hasFilm && ctx.minutter!=null && ctx.ruller!=null) break;
   }
   return ctx;
@@ -234,14 +272,50 @@ function smalfilmDiscount(totalMinutes){
   if (totalMinutes >  180) return 0.10;   // > 3 t
   return 0;
 }
-function priceSmalfilm(minutter, ruller, prices){
-  const perMin   = toNum(prices.smalfilm_min_rate ?? prices.smalfilm_per_minutt ?? 75);
-  const startGeb = toNum(prices.smalfilm_start_per_rull ?? 95);
+
+// beregn satser for smalfilm ut fra gauge/lyd
+function getSmalfilmRates(prices, { gauge, sound }){
+  // defaults (gjelder "generisk smalfilm" / Super8/8mm uten lyd)
+  let perMin   = toNum(prices.smalfilm_min_rate ?? prices.smalfilm_per_minutt ?? 75);
+  let startGeb = toNum(prices.smalfilm_start_per_rull ?? 95);
+  let addPerMin = 0;
+
+  // 16 mm – egne satser
+  if (gauge === "16mm"){
+    const per20Base = toNum(prices.film16_per20 ?? 1795); // 20 minutter
+    const per20Mag  = toNum(prices.film16_mag_sound_per20 ?? 200);
+    const per20Opt  = toNum(prices.film16_optical_per20 ?? 2990);
+    perMin   = per20Base / 20;            // 89.75
+    startGeb = toNum(prices.film16_start_per_rull ?? 125);
+
+    if (sound === "optisk") {
+      perMin = per20Opt / 20;            // 149.5
+    } else if (sound === "magnetisk" || sound === "ja") {
+      addPerMin = per20Mag / 20;         // +10
+    }
+  }
+
+  // Super 8 / 8 mm – lydtillegg (100 pr 20 min)
+  if ((gauge === "super8" || gauge === "8mm") && (sound === "ja" || sound === "magnetisk" || sound === "optisk")) {
+    const per20S8Sound = toNum(prices.super8_sound_per20 ?? 100);
+    addPerMin += per20S8Sound / 20;      // +5
+  }
+
+  return { perMin: perMin + addPerMin, startGeb };
+}
+
+function priceSmalfilm(minutter, ruller, prices, opts={}){
+  const rates = getSmalfilmRates(prices, opts);
+  const perMin   = rates.perMin;
+  const startGeb = rates.startGeb;
   const usbMin   = toNum(prices.usb_min_price ?? prices.minnepenn ?? 295);
 
   if (minutter == null){
+    const gaugeTxt = opts?.gauge === "16mm"
+      ? `16 mm prises ca. ${(toNum(prices.film16_per20 ?? 1795)/20).toFixed(2)} kr/min (+${(toNum(prices.film16_mag_sound_per20 ?? 200)/20).toFixed(2)} kr/min ved magnetisk lyd, eller ${(toNum(prices.film16_optical_per20 ?? 2990)/20).toFixed(2)} kr/min ved optisk lyd). Startgebyr ${toNum(prices.film16_start_per_rull ?? 125)} kr pr rull.`
+      : `Smalfilm prises med ca. ${perMin.toFixed(2)} kr per minutt + ${startGeb} kr i startgebyr per rull.`;
     const txt = [
-      `Smalfilm prises med ca. ${perMin} kr per minutt + ${startGeb} kr i startgebyr per rull.`,
+      gaugeTxt,
       `Vi gir 10% rabatt når samlet spilletid er over 3 timer, og 20% rabatt over 6 timer.`,
       `Oppgi gjerne antall minutter og ruller for et konkret prisestimat. USB/minnepenn kommer i tillegg (fra ${usbMin} kr).`
     ].join(" ");
@@ -256,17 +330,18 @@ function priceSmalfilm(minutter, ruller, prices){
   const start  = rolls * startGeb;
   const total  = round5(arbeid + start);
 
-  let out = `For ${mins} minutter smalfilm og ${rolls} ${rolls===1?"rull":"ruller"} er prisen ca ${nok(total)} kr.`;
+  const gaugeLabel = opts?.gauge ? ` (${opts.gauge})` : "";
+  let out = `For ${mins} minutter smalfilm${gaugeLabel} og ${rolls} ${rolls===1?"rull":"ruller"} er prisen ca ${nok(total)} kr.`;
   if (disc>0) out += ` (Rabatt er inkludert: ${(disc*100).toFixed(0)}% for ${(mins/60).toFixed(1)} timer totalt.)`;
   out += ` USB/minnepenn kommer i tillegg (fra ${usbMin} kr).`;
 
   return { answer: out, source: "Pris" };
 }
 
-// video
+// video (VHS/Hi8/Video8/MiniDV etc.)
 function parseVideoIntent(text=""){
   const m = text.toLowerCase();
-  if (!/(vhs|videokassett|videobånd|hi8|video8|minidv|vhsc)/.test(m)) return null;
+  if (!/(vhs|videokassett|videobånd|hi8|video8|minidv|vhsc)\b/.test(m)) return null;
   const minutter = extractMinutes(m);
   const kMatch   = m.match(/(\d{1,3})\s*(kassett|kassetter|bånd|videobånd)\b/);
   const kassetter= kMatch ? toInt(kMatch[1]) : null;
@@ -313,7 +388,7 @@ function priceVideo({minutter, kassetter}, prices){
   };
 }
 
-/* ---------- Purchase intent handler (utenfor handler for klarhet) ---------- */
+/* ---------- Purchase intent handler ---------- */
 function handlePurchaseIntent(message, prices={}){
   if (!looksLikePurchase(message)) return null;
 
@@ -362,7 +437,7 @@ function handlePurchaseIntent(message, prices={}){
   };
 }
 
-/* ---------- Booking intent (utenfor handler) ---------- */
+/* ---------- Booking intent ---------- */
 function parseBookingIntent(message, history){
   if (!looksLikeBooking(message)) return null;
 
@@ -373,7 +448,7 @@ function parseBookingIntent(message, history){
   let want   = extractDeliverable(message);
   let email  = extractEmail(message);
 
-  // fyll inn hull fra historikk (siste oppgitte vinner)
+  // fyll inn hull fra historikk
   if (!when)  when  = fromHistory(history, extractDate);
   if (!time)  time  = fromHistory(history, extractTimeRange);
   if (!place) place = fromHistory(history, extractPlace);
@@ -405,7 +480,7 @@ async function handleBookingIntent(message, history){
     };
   }
 
-  // Vi har alt – send varsel til dere
+  // Vi har alt – send varsel
   const to   = process.env.LUNA_ALERT_TO   || "kontakt@lunamedia.no";
   const from = process.env.LUNA_ALERT_FROM || "Luna Media <post@lunamedia.no>";
 
@@ -466,7 +541,7 @@ export default async function handler(req, res){
       return res.status(200).json({ answer: kbHits[0].a, source: "FAQ" });
     }
 
-    // 2) Purchase intent (KJØP) – før pris-intenter
+    // 2) Purchase intent (før pris-intenter)
     const salesHit = handlePurchaseIntent(message, prices);
     if (salesHit) return res.status(200).json(salesHit);
 
@@ -477,23 +552,26 @@ export default async function handler(req, res){
       return res.status(200).json( priceVideo(vIntent, prices) );
     }
 
-    // Smalfilm m/kontekst
+    // 4) Smalfilm m/kontekst (inkl. gauge/lyd)
     const smNow  = parseSmalfilmLoose(message);
     const smHist = historySmalfilm(history);
     const shouldSmalfilm =
       smNow.hasFilm ||
       (smNow.mentionsRullOnly && (smHist.hasFilm || smHist.minutter!=null));
+
     if (shouldSmalfilm){
       const minutter = smNow.minutter ?? smHist.minutter ?? null;
       const ruller   = smNow.ruller   ?? smHist.ruller   ?? null;
-      return res.status(200).json( priceSmalfilm(minutter, ruller, prices) );
+      const gauge    = smNow.gauge    ?? smHist.gauge    ?? null;
+      const sound    = smNow.sound    ?? smHist.sound    ?? null;
+      return res.status(200).json( priceSmalfilm(minutter, ruller, prices, { gauge, sound }) );
     }
 
-    // 4) Booking intent
+    // 5) Booking intent
     const bookingHit = await handleBookingIntent(message, history);
     if (bookingHit) return res.status(200).json(bookingHit);
 
-    // 5) LLM fallback (med filming-guard i prompten)
+    // 6) LLM fallback (med filming-guard i prompten)
     const system = [
       'Du er "Luna" – en vennlig og presis AI-assistent for Luna Media (Vestfold).',
       "Svar kort på norsk. Bruk priseksempler og FAQ nedenfor når relevant.",
