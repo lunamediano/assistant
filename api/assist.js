@@ -24,6 +24,19 @@ const toNum  = (v, d=0) => (Number.isFinite(Number(v)) ? Number(v) : d);
 const nok    = (n) => toNum(n,0).toLocaleString("no-NO");
 const round5 = (n) => Math.round(n/5)*5;
 
+/* ---- word-boundary utils (unngå “rammer” i “Drammen”) ---- */
+const WORD_LB = String.raw`(?:^|[^\p{L}\p{N}])`;   // venstre grense: start eller ikke-bokstav/siffer
+const WORD_RB = String.raw`(?:[^\p{L}\p{N}]|$)`;   // høyre  grense
+const reEscape = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function hasAnyWord(msg="", words=[]){
+  const m = (msg||"").toLowerCase();
+  return words.some(w => new RegExp(`${WORD_LB}${reEscape(w.toLowerCase())}${WORD_RB}`,"iu").test(m));
+}
+function hasAnyPattern(msg="", patterns=[]){
+  const m = (msg||"").toLowerCase();
+  return patterns.some(p => new RegExp(p,"iu").test(m));
+}
+
 /* ---------------- load data ---------------- */
 function loadData() {
   const faqFiles = [
@@ -119,97 +132,15 @@ function extractRuller(text=""){
   if (rw){ const n = wordToNum(rw[1]); if(n!=null) return n; }
   return null;
 }
-
-/* ---------------- LEVERINGS-INTENT ---------------- */
-function looksLikeDelivery(msg = "") {
-  const m = (msg || "").toLowerCase();
-  const keys = [
-    "hvor kan jeg levere","hvor leverer jeg","hvor levere",
-    "innlevering","levere","levering","innlevere",
-    "motta","tar dere imot","tar dere i mot","ta imot",
-    "materiale","pakke","forsendelse","post","norgespakke",
-    "adresse","hvor skal jeg sende","hvor sender jeg"
-  ];
-  return keys.some(k => m.includes(k));
-}
-function handleDeliveryIntent(message) {
-  if (!looksLikeDelivery(message)) return null;
-  const text = [
-    "Du kan sende pakken med Norgespakke med sporing til:",
-    "Luna Media, Pb. 60, 3107 Sem (bruk mottakers mobil 997 05 630).",
-    "",
-    "Du kan også levere direkte:",
-    "- Sem Senteret (2. etg.), Andebuveien 3, 3170 Sem",
-    "- Desk på Bislett i Oslo (Sofies gate 66A) – etter avtale",
-    "",
-    "Ring 33 74 02 80 eller skriv til kontakt@lunamedia.no for å avtale levering/henting."
-  ].join("\n");
-  return { answer: text, source: "Info" };
-}
-
-/* ---------------- KJØPS-INTENT ---------------- */
-const PURCHASE_WORDS = [
-  "kjøpe","kjøp","selger dere","kan jeg kjøpe","bestille","pris på usb","minnepenn pris",
-  "ramme","rammer","fotoutskrift","print","fine art","papir","tom kassett","tomme videokassetter",
-  "blank kassett","dvd-plater","cd-plater","minnepenner","memory stick"
-];
-const includesAny = (m, arr) => arr.some(w => m.includes(w));
-
-function handlePurchaseIntent(message, prices={}) {
-  const m = (message||"").toLowerCase();
-  if (!includesAny(m, PURCHASE_WORDS)) return null;
-
-  const usbMin = Number(prices?.usb_min_price ?? prices?.minnepenn ?? 295);
-
-  // Tomme kassetter
-  if (includesAny(m, ["tom kassett","tomme videokassetter","blank kassett","vhs-kassett"]) &&
-      !includesAny(m, ["minnepenn","usb"])) {
-    return {
-      answer:
-        "Vi selger ikke tomme video-/VHS-kassetter. Vi **digitaliserer** eksisterende opptak. " +
-        `Til lagring selger vi **USB/minnepenner** i flere størrelser (fra ca. ${usbMin} kr). ` +
-        "Vi tilbyr også **fotoutskrifter i fine-art** og **rammer**. Si hva du ønsker, så hjelper jeg deg.",
-      source: "Info"
-    };
-  }
-  // USB/minnepenn
-  if (includesAny(m, ["usb","minnepenn","minnepenner","memory stick"])) {
-    return {
-      answer: `Ja, vi selger **USB/minnepenner** i ulike størrelser. Pris fra ca. ${usbMin} kr. ` +
-              "Si hvor mye lagringsplass du trenger (f.eks. 32/64/128 GB), så foreslår jeg riktig størrelse.",
-      source: "Info"
-    };
-  }
-  // Prints/Rammer
-  if (includesAny(m, ["fotoutskrift","print","fine art","papir","ramme","rammer"])) {
-    return {
-      answer: "Ja, vi tilbyr **fotoutskrifter i fine-art-kvalitet** og **rammer**. " +
-              "Oppgi ønsket størrelse og antall (f.eks. 30×40 cm, 5 stk), så gir vi pris og leveringstid.",
-      source: "Info"
-    };
-  }
-  // Generelt
-  return {
-    answer: "Vi har et begrenset utvalg for salg: **USB/minnepenner**, **fine-art-prints** og **rammer**. " +
-            "Fortell hva du ønsker (type/størrelse/antall), så hjelper jeg deg med pris og levering.",
-    source: "Info"
-  };
-}
-
-/* ---------------- BOOKING-INTENT (med e-postvarsel via Resend) ---------------- */
-const BOOKING_WORDS = [
-  "filme","filming","videoopptak","opptak","arrangement","konfirmasjon","bryllup","jubileum",
-  "event","konsert","seremoni","presentasjon","lansering","messe","konferanse"
-];
-const looksLikeBooking = (s="") => BOOKING_WORDS.some(w => s.toLowerCase().includes(w));
-
-const extractEmail = (s="") => (s.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi)||[])[0]||null;
+function extractEmail(s=""){ const m=(s.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi)||[]); return m[0]||null; }
 function extractDate(s=""){
-  const m = (s||"").toLowerCase().match(/\b(\d{1,2}[.\-/]\d{1,2}(?:[.\-/]\d{2,4})?|\d{1,2}\s*(?:jan|feb|mar|apr|mai|jun|jul|aug|sep|sept|okt|nov|des|januar|februar|mars|april|mai|juni|juli|august|september|oktober|november|desember))\b/);
+  const m = (s||"").toLowerCase()
+    .match(/\b(\d{1,2}[.\-/]\d{1,2}(?:[.\-/]\d{2,4})?|\d{1,2}\s*(?:jan|feb|mar|apr|mai|jun|jul|aug|sep|sept|okt|nov|des|januar|februar|mars|april|mai|juni|juli|august|september|oktober|november|desember))\b/);
   return m ? m[1] : null;
 }
 function extractTimeRange(s=""){
-  const m = (s||"").toLowerCase().match(/\b(?:kl\.?\s*)?(\d{1,2}(?::\d{2})?)\s*[–-]\s*(\d{1,2}(?::\d{2})?)\b/);
+  const m = (s||"").toLowerCase()
+    .match(/\b(?:kl\.?\s*)?(\d{1,2}(?::\d{2})?)\s*[–-]\s*(\d{1,2}(?::\d{2})?)\b/);
   return m ? `${m[1]}–${m[2]}` : null;
 }
 function extractPlace(s=""){
@@ -230,6 +161,101 @@ function fromHistory(history, extractor){
   }
   return null;
 }
+
+/* ---------------- LEVERING & HENTING ---------------- */
+function looksLikeDelivery(msg = "") {
+  const keys = [
+    "hvor kan jeg levere","hvor leverer jeg","hvor levere",
+    "innlevering","levere","levering","innlevere",
+    "motta","tar dere imot","tar dere i mot","ta imot",
+    "materiale","pakke","forsendelse","post","norgespakke",
+    "adresse","hvor skal jeg sende","hvor sender jeg"
+  ];
+  return hasAnyWord(msg, keys);
+}
+function handleDeliveryIntent(message) {
+  if (!looksLikeDelivery(message)) return null;
+  const text = [
+    "Du kan sende pakken med Norgespakke med sporing til:",
+    "Luna Media, Pb. 60, 3107 Sem (bruk mottakers mobil 997 05 630).",
+    "",
+    "Du kan også levere direkte:",
+    "- Sem Senteret (2. etg.), Andebuveien 3, 3170 Sem",
+    "- Desk på Bislett i Oslo (Sofies gate 66A) – etter avtale",
+    "",
+    "Ring 33 74 02 80 eller skriv til kontakt@lunamedia.no for å avtale levering/henting."
+  ].join("\n");
+  return { answer: text, source: "Info" };
+}
+
+/* Henting/pickup */
+function looksLikePickup(msg=""){
+  const keys = ["hente","henting","henter dere","kan dere hente","pickup","hente i","hente hos meg","hjemmehenting"];
+  return hasAnyWord(msg, keys);
+}
+function handlePickupIntent(message){
+  if (!looksLikePickup(message)) return null;
+  const place = extractPlace(message);
+  const where = place ? ` i ${place}` : "";
+  const text = [
+    `Det kan være at vi kan hente materialet hjemme hos deg${where}.`,
+    "Ta kontakt, så finner vi en god løsning og avtaler tidspunkt.",
+    "Ring 33 74 02 80 eller skriv til kontakt@lunamedia.no."
+  ].join(" ");
+  return { answer: text, source: "Info" };
+}
+
+/* ---------------- KJØPS-INTENT ---------------- */
+const PURCHASE_WORDS = [
+  "kjøpe","kjøp","selger dere","kan jeg kjøpe","bestille",
+  "pris på usb","minnepenn pris","minnepenner","usb","memory stick","memory-stick",
+  "ramme","rammer","fotoutskrift","print","fine art","papir",
+  "tom kassett","tomme videokassetter","blank kassett","vhs-kassett"
+];
+function handlePurchaseIntent(message, prices={}) {
+  const m = (message||"").toLowerCase();
+  if (!hasAnyWord(m, PURCHASE_WORDS)) return null;
+
+  const usbMin = Number(prices?.usb_min_price ?? prices?.minnepenn ?? 295);
+
+  if (hasAnyWord(m, ["tom kassett","tomme videokassetter","blank kassett","vhs-kassett"]) &&
+      !hasAnyWord(m, ["minnepenn","usb"])) {
+    return {
+      answer:
+        "Vi selger ikke tomme video-/VHS-kassetter. Vi **digitaliserer** eksisterende opptak. " +
+        `Til lagring selger vi **USB/minnepenner** i flere størrelser (fra ca. ${usbMin} kr). ` +
+        "Vi tilbyr også **fotoutskrifter i fine-art** og **rammer**. Si hva du ønsker, så hjelper jeg deg.",
+      source: "Info"
+    };
+  }
+  if (hasAnyWord(m, ["usb","minnepenn","minnepenner","memory stick","memory-stick"])) {
+    return {
+      answer: `Ja, vi selger **USB/minnepenner** i ulike størrelser. Pris fra ca. ${usbMin} kr. ` +
+              "Si hvor mye lagringsplass du trenger (f.eks. 32/64/128 GB), så foreslår jeg riktig størrelse.",
+      source: "Info"
+    };
+  }
+  if (hasAnyWord(m, ["fotoutskrift","print","fine art","papir","ramme","rammer"])) {
+    return {
+      answer: "Ja, vi tilbyr **fotoutskrifter i fine-art-kvalitet** og **rammer**. " +
+              "Oppgi ønsket størrelse og antall (f.eks. 30×40 cm, 5 stk), så gir vi pris og leveringstid.",
+      source: "Info"
+    };
+  }
+  return {
+    answer: "Vi har et begrenset utvalg for salg: **USB/minnepenner**, **fine-art-prints** og **rammer**. " +
+            "Fortell hva du ønsker (type/størrelse/antall), så hjelper jeg deg med pris og levering.",
+    source: "Info"
+  };
+}
+
+/* ---------------- BOOKING (med Resend) ---------------- */
+const BOOKING_WORDS = [
+  "filme","filming","videoopptak","opptak","arrangement","konfirmasjon","bryllup","jubileum",
+  "event","konsert","seremoni","presentasjon","lansering","messe","konferanse"
+];
+const looksLikeBooking = (s="") => hasAnyWord(s, BOOKING_WORDS);
+
 async function sendBookingEmail({to, from, subject, text}) {
   const key = process.env.RESEND_API_KEY;
   if (!key || !to || !from) return { ok:false, reason:"missing-config" };
@@ -414,11 +440,15 @@ export default async function handler(req, res){
 
     const { faq, prices } = loadData();
 
-    // 0) Levering – PRIORITERT
+    // 0) Levering (først)
     const deliveryHit = handleDeliveryIntent(message);
     if (deliveryHit) return res.status(200).json(deliveryHit);
 
-    // 1) Kjøp – før pris/FAQ for å fange “kan jeg kjøpe …”
+    // 0.1) Henting/pickup (før kjøp)
+    const pickupHit = handlePickupIntent(message);
+    if (pickupHit) return res.status(200).json(pickupHit);
+
+    // 1) Kjøp
     const buyHit = handlePurchaseIntent(message, prices);
     if (buyHit) return res.status(200).json(buyHit);
 
@@ -430,7 +460,7 @@ export default async function handler(req, res){
     const bookingHit = await handleBookingIntent(message, history);
     if (bookingHit) return res.status(200).json(bookingHit);
 
-    // 4) Pris-intent – video
+    // 4) Pris – video
     const vIntent = parseVideoIntent(message);
     if (vIntent){
       if (vIntent.minutter == null) {
@@ -442,7 +472,7 @@ export default async function handler(req, res){
       return res.status(200).json( priceVideo(vIntent, prices) );
     }
 
-    // 5) Pris-intent – smalfilm
+    // 5) Pris – smalfilm
     const hasSmalfilm = /(smalfilm|super\s*8|super8|8\s*mm|8mm|16\s*mm|16mm)/.test(message.toLowerCase());
     if (hasSmalfilm){
       let minutter = extractMinutes(message);
