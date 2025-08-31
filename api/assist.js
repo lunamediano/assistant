@@ -10,11 +10,14 @@ const __dirname  = path.dirname(__filename);
 /* -------------------- utils -------------------- */
 function safeRead(file, kind = "text") {
   try {
+    if (!fs.existsSync(file)) return null;
     const raw = fs.readFileSync(file, "utf8");
     if (kind === "json") return JSON.parse(raw);
     if (kind === "yaml") return yaml.load(raw);
     return raw;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 const toInt = (v, d=0) => {
   const n = parseInt(String(v).replace(/[^\d-]/g, ""), 10);
@@ -27,6 +30,8 @@ const round5 = (n) => Math.round(n/5)*5;
 function normalize(s=""){
   return (s+"").toLowerCase().normalize("NFKD");
 }
+function stripMdStars(s=""){ return s.replace(/\*\*/g,""); }
+
 const NO_WORDNUM = {
   "null":0,"en":1,"ett":1,"ei":1,"to":2,"tre":3,"fire":4,"fem":5,"seks":6,"sju":7,"syv":7,
   "åtte":8,"ni":9,"ti":10,"elleve":11,"tolv":12,"tretten":13,"fjorten":14,"femten":15,
@@ -39,36 +44,40 @@ function wordToNum(w){
 
 /* -------------------- data -------------------- */
 function loadData() {
-  const faqCandidates = [
-    path.join(__dirname, "..", "data", "faq.yaml"),
-    path.join(__dirname, "..", "knowledge", "faq_round1.yml"),
-    path.join(__dirname, "..", "knowledge", "faq_round1.yaml"),
-    path.join(__dirname, "..", "knowledge", "luna.yml"),
-  ];
-  let faq = []; let prices = {};
-  for (const p of faqCandidates) {
-    if (!fs.existsSync(p)) continue;
-    const parsed = safeRead(p, "yaml");
-    if (!parsed) continue;
-    if (p.endsWith("luna.yml")) {
-      const f =
-        Array.isArray(parsed?.faq) ? parsed.faq :
-        Array.isArray(parsed?.knowledge?.faq) ? parsed.knowledge.faq : [];
-      if (f?.length) faq = faq.concat(f);
-      const pr = parsed?.priser || parsed?.prices || parsed?.company?.prices;
-      if (pr && typeof pr === "object") prices = { ...prices, ...pr };
-    } else {
-      const items = Array.isArray(parsed) ? parsed : (parsed?.faq || []);
-      if (items?.length) faq = faq.concat(items);
+  try {
+    const faqCandidates = [
+      path.join(__dirname, "..", "data", "faq.yaml"),
+      path.join(__dirname, "..", "knowledge", "faq_round1.yml"),
+      path.join(__dirname, "..", "knowledge", "faq_round1.yaml"),
+      path.join(__dirname, "..", "knowledge", "luna.yml"),
+    ];
+    let faq = []; let prices = {};
+    for (const p of faqCandidates) {
+      const parsed = safeRead(p, "yaml");
+      if (!parsed) continue;
+      if (p.endsWith("luna.yml")) {
+        const f =
+          Array.isArray(parsed?.faq) ? parsed.faq :
+          Array.isArray(parsed?.knowledge?.faq) ? parsed.knowledge.faq : [];
+        if (f?.length) faq = faq.concat(f);
+        const pr = parsed?.priser || parsed?.prices || parsed?.company?.prices;
+        if (pr && typeof pr === "object") prices = { ...prices, ...pr };
+      } else {
+        const items = Array.isArray(parsed) ? parsed : (parsed?.faq || []);
+        if (items?.length) faq = faq.concat(items);
+      }
     }
+    const priceJson = safeRead(path.join(__dirname, "..", "data", "priser.json"), "json");
+    if (priceJson && typeof priceJson === "object") prices = { ...prices, ...priceJson };
+    return { faq, prices };
+  } catch {
+    // Beskytt mot 500 ved filfeil
+    return { faq: [], prices: {} };
   }
-  const priceJson = safeRead(path.join(__dirname, "..", "data", "priser.json"), "json");
-  if (priceJson && typeof priceJson === "object") prices = { ...prices, ...priceJson };
-  return { faq, prices };
 }
 
 /* -------------------- FAQ search -------------------- */
-function normTokens(s){ return normalize(s).replace(/[^\p{Letter}\p{Number}\s]/gu," ").replace(/\s+/g," ").trim().split(" "); }
+function normTokens(s){ return normalize(s).replace(/[^\p{Letter}\p{Number}\s]/gu," ").replace(/\s+/g," ").trim().split(" ").filter(Boolean); }
 function jaccard(aTokens,bTokens){
   if(!aTokens.length||!bTokens.length) return 0;
   const a=new Set(aTokens), b=new Set(bTokens);
@@ -88,11 +97,51 @@ function simpleSearch(userMessage, faqArray, minScore=0.65){
     }
     if(!best || bestLocal>best.score) best={ item, score:bestLocal };
   }
-  if(best && best.score>=minScore) return [{ a:best.item.a, score:best.score, q:best.item.q }];
+  if(best && best.score>=minScore) return [{ a:itemAnswer(best.item), score:best.score }];
   return [];
 }
+function itemAnswer(item){ return typeof item?.a === "string" ? stripMdStars(item.a) : ""; }
 
-/* -------------------- Intents: purchase & repair -------------------- */
+/* -------------------- helpers -------------------- */
+function extractMinutes(text=""){
+  const m = normalize(text);
+  const mm = m.match(/(\d{1,4})\s*(min|minutt|minutter)\b/);
+  const hh = m.match(/(\d{1,3})\s*(t|time|timer)\b/);
+  if (mm) return toInt(mm[1]);
+  if (hh) return toInt(hh[1]) * 60;
+  const wm = m.match(/([a-zæøå]+)\s*(min|minutt|minutter)\b/);
+  const wh = m.match(/([a-zæøå]+)\s*(t|time|timer)\b/);
+  if (wm){ const n = wordToNum(wm[1]); if(n!=null) return n; }
+  if (wh){ const n = wordToNum(wh[1]); if(n!=null) return n*60; }
+  return null;
+}
+function extractCount(text="", word){
+  const m = normalize(text);
+  const d = m.match(new RegExp("(\\d{1,3})\\s*"+word+"\\b"));
+  if (d) return toInt(d[1]);
+  const w = m.match(new RegExp("([a-zæøå]+)\\s*"+word+"\\b"));
+  if (w){ const n = wordToNum(w[1]); if(n!=null) return n; }
+  return null;
+}
+function extractDiameters(text=""){
+  const nums = [];
+  const re = /(\d{1,2}(?:[.,]\d)?)\s*cm\b/gi;
+  let m;
+  while((m = re.exec(text))){ nums.push(parseFloat(m[1].replace(",", "."))); }
+  return nums;
+}
+function historyFind(history, extractor){
+  if(!Array.isArray(history)) return null;
+  for(let i=history.length-1;i>=0;i--){
+    const h=history[i];
+    if (h?.role!=="user") continue;
+    const v = extractor(h.content || "");
+    if (v!=null && (Array.isArray(v)? v.length>0 : true)) return v;
+  }
+  return null;
+}
+
+/* -------------------- Intents: purchase, repair, delivery -------------------- */
 const PURCHASE_WORDS = [
   "kjøpe","kjøp","selger","bestille","pris på usb","minnepenn","ramme","rammer","fotoutskrift","print","fine art","papir","tomme videokassetter","tom kassett","blank kassett","dvd-plater","cd-plater"
 ];
@@ -115,7 +164,7 @@ function handlePurchaseIntent(message, prices={}){
   if (mentions(m, ["usb","minnepenn","minnepenner","memory stick"])) {
     return {
       answer:
-        "Ja, vi selger USB/minnepenner i ulike størrelser (god kvalitet). Pris fra ca. " + usbMin + " kr. Si gjerne hvor mye lagringsplass du trenger (for eksempel 32/64/128 GB), så foreslår vi riktig størrelse.",
+        "Ja, vi selger USB/minnepenner i ulike størrelser. Pris fra ca. " + usbMin + " kr. Si gjerne hvor mye lagringsplass du trenger (for eksempel 32/64/128 GB), så foreslår vi riktig størrelse.",
       source: "AI"
     };
   }
@@ -140,53 +189,70 @@ function handleCassetteRepair(message){
   if(!REPAIR_WORDS.some(w=>m.includes(w))) return null;
   return {
     answer:
-      "Ja – vi reparerer videokassetter (VHS, VHSc, Video8/Hi8, MiniDV m.fl.). Vi skjøter brudd i båndet, bytter hus/spole ved behov og kan ofte redde innholdet. Pris avhenger av skadeomfang og antall kassetter – be gjerne om tilbud, så vurderer vi saken og kostnaden før vi begynner.",
+      "Ja – vi reparerer videokassetter (VHS, VHSc, Video8/Hi8, MiniDV m.fl.). Vi skjøter brudd i båndet, bytter hus/spole ved behov og kan ofte redde innholdet. Pris avhenger av skadeomfang og antall kassetter – be gjerne om tilbud, så vurderer vi saken og kostnaden før vi starter.",
     source: "AI"
   };
 }
 
-/* -------------------- Parsing helpers -------------------- */
-function extractMinutes(text=""){
-  const m = normalize(text);
-  const mm = m.match(/(\d{1,4})\s*(min|minutt|minutter)\b/);
-  const hh = m.match(/(\d{1,3})\s*(t|time|timer)\b/);
-  if (mm) return toInt(mm[1]);
-  if (hh) return toInt(hh[1]) * 60;
-  const wm = m.match(/([a-zæøå]+)\s*(min|minutt|minutter)\b/);
-  const wh = m.match(/([a-zæøå]+)\s*(t|time|timer)\b/);
-  if (wm){ const n = wordToNum(wm[1]); if(n!=null) return n; }
-  if (wh){ const n = wordToNum(wh[1]); if(n!=null) return n*60; }
-  return null;
-}
-function extractCount(text="", word){
-  const m = normalize(text);
-  const d = m.match(new RegExp("(\\d{1,3})\\s*"+word+"\\b"));
-  if (d) return toInt(d[1]);
-  const w = m.match(new RegExp("([a-zæøå]+)\\s*"+word+"\\b"));
-  if (w){ const n = wordToNum(w[1]); if(n!=null) return n; }
-  return null;
-}
-function extractDiameters(text=""){
-  // returns array of numbers in cm
-  const nums = [];
-  const re = /(\d{1,2}(?:[.,]\d)?)\s*cm\b/gi;
-  let m;
-  while((m = re.exec(text))){ nums.push(parseFloat(m[1].replace(",", "."))); }
-  return nums;
-}
-function historyFind(history, fn){
-  if(!Array.isArray(history)) return null;
-  for(let i=history.length-1;i>=0;i--){
-    const h=history[i];
-    if (h?.role!=="user") continue;
-    const v = fn(h.content||"");
-    if (v!=null && (Array.isArray(v)? v.length : true)) return v;
+// Levering / henting
+const DELIVERY_WORDS = ["levere","levering","post","sendes","adresse","hente","henting","innlevering","leverer dere","kan dere hente","hente i"];
+function handleDelivery(message){
+  const m = normalize(message);
+  if (!DELIVERY_WORDS.some(w=>m.includes(w))) return null;
+
+  // spesifikk "hente i [sted]" (eks. Drammen)
+  if (/\bhent(e)?\b.*\bi\s+([a-zæøå]+)\b/.test(m)){
+    const place = (m.match(/\bhent(e)?\b.*\bi\s+([a-zæøå]+)\b/)||[])[2];
+    return {
+      answer:
+        (place ? `Det kan hende vi kan hente i ${place}. ` : "Det kan hende vi kan hente hos deg. ") +
+        "Ta kontakt, så finner vi en god løsning. Ring 33 74 02 80 eller skriv til kontakt@lunamedia.no.",
+      source: "AI"
+    };
   }
-  return null;
+
+  // generell leveringsinfo inkl. Norgespakke
+  const text = [
+    "Du kan sende pakken med Norgespakke med sporing til:",
+    "Luna Media, Pb. 60, 3107 Sem (bruk mottakers mobil 997 05 630).",
+    "",
+    "Du kan også levere direkte:",
+    "- Sem Senteret (2. etg.), Andebuveien 3, 3170 Sem",
+    "- Desk på Bislett i Oslo (Sofies gate 66A) – etter avtale",
+    "",
+    "Ring 33 74 02 80 eller skriv til kontakt@lunamedia.no for å avtale levering/henting."
+  ].join("\n");
+  return { answer: text, source: "AI" };
 }
 
-/* -------------------- Smalfilm/S8 estimator -------------------- */
-// Minutes per spool, by nearest diameter (cm)
+/* -------------------- Film parsing (8mm/S8 + 16mm) -------------------- */
+function looksLikeS8or8mm(msg){ return /(super\s*8|s8\b|8\s*mm|8mm|dobbel[-\s]?8|d8\b)/.test(normalize(msg)); }
+function looksLike16mm(msg){ return /\b16\s*mm\b|\b16mm\b/.test(normalize(msg)); }
+function extractSound16(msg){
+  const m = normalize(msg);
+  if (/\boptisk\b/.test(m)) return "optisk";
+  if (/\bmagnetisk\b/.test(m)) return "magnetisk";
+  return "none";
+}
+function parseCombinedFilm(message, history){
+  const isS8 = looksLikeS8or8mm(message) || !!historyFind(history, t=>looksLikeS8or8mm(t)?true:null);
+  const is16 = looksLike16mm(message)    || !!historyFind(history, t=>looksLike16mm(t)?true:null);
+
+  const diamsNow = extractDiameters(message);
+  const diamsHist= historyFind(history, extractDiameters) || [];
+  const diameters = (diamsNow.length?diamsNow:[]).concat(diamsHist.length?diamsHist:[]);
+
+  const isSuper8 = /super\s*8|s8\b/.test(normalize(message)) || !!historyFind(history, t=>/super\s*8|s8\b/.test(normalize(t))?true:null);
+
+  const rollsS8 = extractCount(message, "rull") ?? extractCount(message, "ruller") ??
+                  historyFind(history, t => extractCount(t,"rull") ?? extractCount(t,"ruller"));
+  const minutesAny = extractMinutes(message) ?? historyFind(history, extractMinutes);
+  const sound16 = extractSound16(message) || (historyFind(history, t=>extractSound16(t)) ?? "none");
+
+  return { isS8, is16, diameters, isSuper8, rollsS8, minutesAny, sound16 };
+}
+
+/* -------------------- Smalfilm (S8/8 mm) tabell -------------------- */
 const S8_MAP = [
   { d: 7.5,  minutes: { s8: 4,   std8: 4 } },
   { d: 12.7, minutes: { s8: 12,  std8: 16 } },
@@ -218,17 +284,16 @@ function smalfilmDiscount(totalMinutes){
   return 0;
 }
 
-// 8mm/S8 standard prising (minutter + startgebyr per rull)
 function priceS8Std({ minutes, rolls, prices, hasSound=false }){
   const perMinBase = toNum(prices.smalfilm_min_rate ?? prices.smalfilm_per_minutt ?? 75);
   const startGeb   = toNum(prices.smalfilm_start_per_rull ?? 95);
-  // S8 med lyd: +100/20min => +5 kr/min
-  const perMin = hasSound ? perMinBase + 5 : perMinBase;
-  const usbMin = toNum(prices.usb_min_price ?? prices.minnepenn ?? 295);
-  const mins   = Math.max(0, toInt(minutes));
-  const r      = Math.max(1, toInt(rolls ?? 1));
-  const disc   = smalfilmDiscount(mins);
-  const total  = round5(mins * perMin * (1 - disc) + r * startGeb);
+  const perMin     = hasSound ? perMinBase + 5 : perMinBase; // +5 kr/min ved lyd på S8
+  const usbMin     = toNum(prices.usb_min_price ?? prices.minnepenn ?? 295);
+  const mins       = Math.max(0, toInt(minutes));
+  const r          = Math.max(1, toInt(rolls ?? 1));
+  const disc       = smalfilmDiscount(mins);
+  const total      = round5(mins * perMin * (1 - disc) + r * startGeb);
+
   let out = `For ${mins} minutter smalfilm og ${r} ${r===1?"rull":"ruller"} er prisen ca ${nok(total)} kr.`;
   if (disc>0) out += ` (Rabatt er inkludert: ${(disc*100).toFixed(0)}% for ${(mins/60).toFixed(1)} timer totalt.)`;
   out += ` USB/minnepenn kommer i tillegg (fra ${usbMin} kr).`;
@@ -236,13 +301,11 @@ function priceS8Std({ minutes, rolls, prices, hasSound=false }){
   return { answer: out, source: "Pris" };
 }
 
-// 16mm prising
-function price16mm({ minutes, rolls=1, sound="none" /* "magnetisk" | "optisk" | "none" */ }){
-  // base 1795/20min => 89.75 / min
-  let perMin = 1795/20;
+function price16mm({ minutes, rolls=1, sound="none" }){
+  let perMin = 1795/20;                 // 89,75/min
   const start = 125 * Math.max(1, toInt(rolls));
   if (sound === "magnetisk") perMin += 200/20;  // +10/min
-  if (sound === "optisk")    perMin  = 2990/20; // 149.5/min (optisk erstatter base)
+  if (sound === "optisk")    perMin  = 2990/20; // 149,5/min (erstatter base)
   const mins = Math.max(0, toInt(minutes));
   const total = round5(mins * perMin + start);
   let label = "uten oppgitt lyd";
@@ -254,7 +317,6 @@ function price16mm({ minutes, rolls=1, sound="none" /* "magnetisk" | "optisk" | 
   return { answer: out, source: "Pris" };
 }
 
-// Video (VHS/Hi8/MiniDV) prising
 function priceVideo({ minutes }, prices){
   const perTime = toNum(prices?.vhs_per_time ?? prices?.video_per_time ?? prices?.vhs_per_time_kr ?? 315);
   const usbMin  = toNum(prices?.usb_min_price ?? prices?.minnepenn ?? 295);
@@ -275,53 +337,9 @@ function priceVideo({ minutes }, prices){
   return { answer: out, source: "Pris" };
 }
 
-/* -------------------- Film intent parsing (8mm/S8 + 16mm) -------------------- */
-function looksLikeS8or8mm(msg){
-  const m = normalize(msg);
-  return /(super\s*8|s8\b|8\s*mm|8mm|dobbel[-\s]?8|d8\b)/.test(m);
-}
-function looksLike16mm(msg){
-  return /\b16\s*mm\b|\b16mm\b/.test(normalize(msg));
-}
-function extractSound16(msg){
-  const m = normalize(msg);
-  if (/\boptisk\b/.test(m)) return "optisk";
-  if (/\bmagnetisk\b/.test(m)) return "magnetisk";
-  return "none";
-}
-function parseCombinedFilm(message, history){
-  const m = message;
-  const isS8 = looksLikeS8or8mm(m) || looksLikeS8or8mm(historyFind(history,h=>h)||"");
-  const is16 = looksLike16mm(m)    || looksLike16mm(historyFind(history,h=>h)||"");
-
-  const diamsNow = extractDiameters(m);
-  const diamsHist= historyFind(history, extractDiameters) || [];
-  const diameters = (diamsNow.length?diamsNow:[]).concat(diamsHist.length?diamsHist:[]);
-
-  // Identify if user said "super 8" explicitly
-  const isSuper8 = /super\s*8|s8\b/.test(normalize(m)) || /super\s*8|s8\b/.test(normalize(historyFind(history,h=>h)||""));
-
-  // Count rolls if given
-  const rollsS8 = extractCount(m, "rull") ?? extractCount(m, "ruller");
-  const rollsHist = historyFind(history, t => extractCount(t, "rull") ?? extractCount(t,"ruller")) ?? null;
-
-  const minutesAny = extractMinutes(m);
-  const minutesHist = historyFind(history, extractMinutes);
-
-  // 16mm specifics
-  const sound16 = extractSound16(m) || extractSound16(historyFind(history,h=>h)||"");
-
-  return {
-    isS8, is16,
-    diameters, isSuper8,
-    rollsS8: rollsS8 ?? rollsHist,
-    minutesAny: minutesAny ?? minutesHist,
-    sound16
-  };
-}
-
 /* -------------------- handler -------------------- */
 export default async function handler(req, res){
+  // CORS
   const allowed = (process.env.LUNA_ALLOWED_ORIGINS || "*").split(",").map(s=>s.trim());
   const origin = req.headers.origin || "";
   if (allowed.includes("*") || allowed.includes(origin)) {
@@ -336,48 +354,55 @@ export default async function handler(req, res){
   if (req.method !== "POST") return res.status(405).json({ error:"Method not allowed" });
 
   try {
-    let body = req.body || {};
-    if (typeof body === "string") { try{ body = JSON.parse(body); } catch { body = {}; } }
-    const message = (body.message || "").trim();
-    const history = Array.isArray(body.history) ? body.history : [];
-    if (!message) return res.status(400).json({ error:"Missing message" });
+    let body = req.body;
+    if (typeof body === "undefined") {
+      // Beskyttelse: enkelte deployer gir tom body uten middleware
+      const buf = await new Promise((resolve)=> {
+        let data=""; req.on("data", chunk=>data+=chunk);
+        req.on("end", ()=>resolve(data));
+      });
+      try { body = JSON.parse(buf || "{}"); } catch { body = {}; }
+    } else if (typeof body === "string") {
+      try{ body = JSON.parse(body); } catch { body = {}; }
+    }
+
+    const message = (body?.message || "").trim();
+    const history = Array.isArray(body?.history) ? body.history : [];
+    if (!message) return res.status(200).json({ answer: "Si gjerne litt mer om hva du lurer på, så hjelper jeg deg.", source: "AI" });
 
     const { faq, prices } = loadData();
 
-    // 0) Hard intents: purchase / repair
+    // — intents med høy prioritet —
     const purchase = handlePurchaseIntent(message, prices);
     if (purchase) return res.status(200).json(purchase);
 
     const repair = handleCassetteRepair(message);
     if (repair) return res.status(200).json(repair);
 
-    // 1) FAQ
+    const delivery = handleDelivery(message);
+    if (delivery) return res.status(200).json(delivery);
+
+    // — FAQ —
     const kbHits = simpleSearch(message, faq);
     if (kbHits?.[0]?.a) return res.status(200).json({ answer: kbHits[0].a, source: "FAQ" });
 
-    // 2) Film intents (S8/8mm + 16mm) — combined & follow-ups
+    // — Film-intents —
     const parsed = parseCombinedFilm(message, history);
 
-    // If S8 diameters were provided, estimate minutes and price
+    // S8/8 mm: diametre → minutter
     if (parsed.isS8 && parsed.diameters.length){
       const mins = estimateS8MinutesFromDiameters(parsed.diameters, parsed.isSuper8);
       const rolls = parsed.rollsS8 ?? parsed.diameters.length || 1;
-      const hasSound = /lyd/.test(normalize(message)); // enkel heuristikk
-      return res.status(200).json(
-        priceS8Std({ minutes: mins, rolls, prices, hasSound })
-      );
+      const hasSound = /lyd/.test(normalize(message));
+      return res.status(200).json( priceS8Std({ minutes: mins, rolls, prices, hasSound }) );
     }
-
-    // If S8 mentioned with minutes directly:
+    // S8/8 mm med minutter
     if (parsed.isS8 && parsed.minutesAny != null){
       const rolls = parsed.rollsS8 ?? 1;
       const hasSound = /lyd/.test(normalize(message));
-      return res.status(200).json(
-        priceS8Std({ minutes: parsed.minutesAny, rolls, prices, hasSound })
-      );
+      return res.status(200).json( priceS8Std({ minutes: parsed.minutesAny, rolls, prices, hasSound }) );
     }
-
-    // If user asks "hvordan beregne" / mangler data for S8
+    // S8 veiledning
     if (parsed.isS8){
       const guide =
         "For å anslå spilletid per rull: oppgi diameter på spolene og om det er 8 mm eller Super 8.\n" +
@@ -390,33 +415,34 @@ export default async function handler(req, res){
       return res.status(200).json({ answer: guide, source: "AI" });
     }
 
-    // 16 mm intent
+    // 16 mm
     if (parsed.is16){
-      // minutes known?
       if (parsed.minutesAny != null){
-        return res.status(200).json(
-          price16mm({ minutes: parsed.minutesAny, rolls: 1, sound: parsed.sound16 })
-        );
+        return res.status(200).json( price16mm({ minutes: parsed.minutesAny, rolls: 1, sound: parsed.sound16 }) );
       }
-      // ask for minutes/meters + lyd
-      const ask =
-        "For 16 mm trenger jeg minutter (eller meter) per rull, og om lyden er optisk eller magnetisk. Skriv for eksempel: «16 mm: 35 min, optisk lyd».";
-      return res.status(200).json({ answer: ask, source: "AI" });
+      return res.status(200).json({
+        answer: "For 16 mm trenger jeg minutter (eller meter) per rull, og om lyden er optisk eller magnetisk. Skriv for eksempel: «16 mm: 35 min, optisk lyd».",
+        source: "AI"
+      });
     }
 
-    // Video (VHS/Hi8/MiniDV) — hvis melding inneholder disse
+    // Video (VHS/Hi8/MiniDV)
     if (/(vhs|videokassett|videobånd|hi8|video8|minidv|vhsc)/i.test(message)){
       const minutes = extractMinutes(message) ?? historyFind(history, extractMinutes);
       return res.status(200).json( priceVideo({ minutes }, prices) );
     }
 
-    // 3) LLM fallback – med forsiktighet rundt påstander om personer/partnere
+    // — LLM fallback (sikker) —
     const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-    const model = process.env.LUNA_MODEL || "gpt-4o-mini";
+    if (!OPENAI_API_KEY){
+      return res.status(200).json({
+        answer: "Beklager, jeg har ikke et godt svar på dette akkurat nå. Send oss gjerne en e-post på kontakt@lunamedia.no eller ring 33 74 02 80.",
+        source:"fallback_no_key"
+      });
+    }
 
     const guard =
-      "Ikke finn opp fakta om personer eller samarbeidspartnere. Hvis du blir spurt om hvem som jobber i Luna Media eller konkrete samarbeid, svar nøkternt at du ikke kan bekrefte dette her og henvis til e-post/telefon for avklaring.";
-
+      "Ikke finn opp fakta om personer eller samarbeidspartnere. Hvis du blir spurt om hvem som jobber i Luna Media eller konkrete samarbeid, svar nøkternt at du ikke kan bekrefte dette her og henvis til e-post/telefon for avklaring. Ikke bruk markdown-stjerner.";
     const system = [
       'Du er "Luna" – en vennlig og presis assistent for Luna Media (Vestfold).',
       "Svar kort på norsk (2–3 setninger). Bruk konkrete tall bare når du er sikker.",
@@ -426,36 +452,39 @@ export default async function handler(req, res){
     let answer =
       "Beklager, jeg har ikke et godt svar på dette akkurat nå. Send oss gjerne en e-post på kontakt@lunamedia.no eller ring 33 74 02 80.";
 
-    if (!OPENAI_API_KEY){
-      return res.status(200).json({ answer, source:"fallback_no_key" });
-    }
+    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json", "Authorization":`Bearer ${OPENAI_API_KEY}` },
+      body: JSON.stringify({
+        model: process.env.LUNA_MODEL || "gpt-4o-mini",
+        temperature:0.3, max_tokens:300,
+        messages: [
+          { role:"system", content: system },
+          ...history.slice(-12),
+          { role:"user", content: `Kunde spør: ${message}\nSvar kort, konkret, og ikke bruk markdown-stjerner.` }
+        ]
+      })
+    });
 
-    try{
-      const resp = await fetch("https://api.openai.com/v1/chat/completions", {
-        method:"POST",
-        headers:{ "Content-Type":"application/json", "Authorization":`Bearer ${OPENAI_API_KEY}` },
-        body: JSON.stringify({
-          model, temperature:0.3, max_tokens:300,
-          messages: [
-            { role:"system", content: system },
-            ...history.slice(-12),
-            { role:"user", content: `Kunde spør: ${message}\nSvar kort, konkret, og ikke bruk markdown-stjerner.` }
-          ]
-        })
-      });
-      const text = await resp.text();
-      let data; try{ data = JSON.parse(text); } catch { throw new Error("OpenAI JSON parse error: " + text); }
-      if (!resp.ok) throw new Error(data?.error?.message || `OpenAI ${resp.status}`);
-      const content = data?.choices?.[0]?.message?.content?.trim();
-      if (content) answer = content.replace(/\*\*/g,""); // fjern ev. stjerner
-      return res.status(200).json({ answer, source:"AI" });
-    } catch (e){
-      console.error("OpenAI-kall feilet:", e?.message);
+    // Robust parsing (unngå 500 ved API-feil)
+    const raw = await resp.text();
+    let data = null;
+    try { data = JSON.parse(raw); } catch { /* ignore */ }
+    if (!resp.ok){
+      const msg = data?.error?.message || `OpenAI ${resp.status}`;
+      console.error("OpenAI-feil:", msg, raw);
       return res.status(200).json({ answer, source:"fallback_openai_error" });
     }
+    const content = data?.choices?.[0]?.message?.content?.trim();
+    if (content) answer = stripMdStars(content);
+    return res.status(200).json({ answer, source:"AI" });
 
   } catch (err){
-    console.error("Handler-feil:", err);
-    return res.status(500).json({ error:"Server error" });
+    console.error("Handler-feil:", err?.stack || err?.message || err);
+    // Returner 200 med generelt svar (heller enn 500 i UI)
+    return res.status(200).json({
+      answer: "Oi, her fikk jeg et teknisk problem. Kan du prøve å formulere spørsmålet på nytt, eller sende oss en e-post på kontakt@lunamedia.no?",
+      source: "fallback_runtime_error"
+    });
   }
 }
