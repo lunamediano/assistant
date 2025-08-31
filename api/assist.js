@@ -240,9 +240,10 @@ function estFromMeters(meters, type = null) {
 function handleSmalfilmLengthIntent(message, history){
   const m = (message || "").toLowerCase();
 
-  const mentionsFilm = smalfilmInText(m) || inSmalfilmContext(history);
-  const mentionsLen  = hasLengthWords(m) || /(spol|diameter|cm|meter|m)\b/.test(m);
-  if (!mentionsFilm || !mentionsLen) return null;
+  const mentionsFilm   = smalfilmInText(m) || inSmalfilmContext(history);
+  const mentionsLen    = hasLengthWords(m) || /(spol|diameter|cm|meter|m)\b/.test(m);
+  const mentionsRuller = /(rull|ruller)\b/.test(m);
+  if (!mentionsFilm || !(mentionsLen || mentionsRuller)) return null;
 
   // Eksplisitte tall?
   const cmMatch = m.match(/(\d{1,2}(?:[.,]\d)?)\s*cm/);
@@ -250,7 +251,6 @@ function handleSmalfilmLengthIntent(message, history){
   const isS8    = /(super\s*8|super8)/.test(m);
   const is8     = /(8\s*mm|8mm)/.test(m) && !isS8;
 
-  // Har vi konkrete mål? → beregn
   if (cmMatch || mMatch){
     let est;
     if (cmMatch){
@@ -264,15 +264,41 @@ function handleSmalfilmLengthIntent(message, history){
 
     if (est.minutes){
       return {
-        answer: `Det tilsvarer omtrent ${est.minutes} minutter ${est.label}. Oppgi gjerne hvor mange slike spoler du har, så kan jeg anslå total spilletid og pris.`,
+        answer: `Det tilsvarer omtrent ${est.minutes} minutter ${est.label}. Oppgi gjerne hvor mange slike spoler du har, så anslår jeg total tid og pris.`,
         source: "Info"
       };
     }
     return {
-      answer: `Det tilsvarer ${est.rangeText}. Si gjerne om det er 8mm eller Super 8 – og hvor mange spoler – så regner jeg total tid og pris.`,
+      answer: `Det tilsvarer ${est.rangeText}. Si gjerne om det er 8 mm eller Super 8 – og hvor mange spoler – så regner jeg total tid og pris.`,
       source: "Info"
     };
   }
+
+  // Ingen cm/meter oppgitt → BER om diameter + viser tabell (spesielt nyttig når bruker bare sier "ruller")
+  if (mentionsRuller){
+    const prompt = [
+      "Kjempefint! For å anslå spilletid per **rull**, oppgi gjerne **diameter** på spolene (og om det er **8 mm** eller **Super 8**).",
+      "",
+      "Kjappe tommelfingerverdier pr rull:",
+      "• 7,5 cm  →  8 mm: ca 4 min  |  Super 8: ca 4 min",
+      "• 12,7 cm →  8 mm: ca 16 min |  Super 8: ca 12 min",
+      "• 14,5 cm →  8 mm: ca 22 min |  Super 8: ca 18 min",
+      "• 17 cm   →  8 mm: ca 32 min |  Super 8: ca 24 min",
+      "",
+      "Skriv f.eks.: «To ruller på 12,7 cm, Super 8». Så regner jeg total tid og gir et prisestimat."
+    ].join("\n");
+    return { answer: prompt, source: "Info" };
+  }
+
+  // Generell veiledning for lengde-anslag
+  const ask = [
+    "Jeg kan hjelpe deg å anslå spilletid per spole.",
+    "Fortell enten **diameteren** (7,5 / 12,7 / 14,5 / 17 cm) eller **omtrent hvor mange meter** film – og si om det er **8 mm** eller **Super 8**.",
+    "Eksempel: «12,7 cm, Super 8, 2 ruller»."
+  ].join("\n");
+  return { answer: ask, source: "Info" };
+}
+
 
   // Ingen cm/meter oppgitt → gi tydelig veiledning
   const ask = [
