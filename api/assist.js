@@ -4,40 +4,36 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
-/* ========================================================================== */
-/* Setup                                                                      */
-/* ========================================================================== */
+/* ------------------------------------------------------- */
+/*  Basissett                                              */
+/* ------------------------------------------------------- */
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 
-/* ---------------------------- Utils --------------------------------------- */
-function safeRead(file, kind = "text") {
-  try {
-    const raw = fs.readFileSync(file, "utf8");
-    if (kind === "json") return JSON.parse(raw);
-    if (kind === "yaml") return yaml.load(raw);
-    return raw;
-  } catch {
-    return null;
-  }
-}
-function toInt(v, def = 0) {
-  const n = parseInt(String(v).replace(/[^\d-]/g, ""), 10);
-  return Number.isFinite(n) ? n : def;
-}
-function toNum(v, def = 0) {
+const toInt = (v, d=0) => {
+  const n = parseInt(String(v).replace(/[^\d-]/g,""),10);
+  return Number.isFinite(n) ? n : d;
+};
+const toNum = (v, d=0) => {
   const n = Number(v);
-  return Number.isFinite(n) ? n : def;
-}
-function nok(n) {
-  return toNum(n, 0).toLocaleString("no-NO");
-}
-function round5(n) {
-  return Math.round(n / 5) * 5;
+  return Number.isFinite(n) ? n : d;
+};
+const nok = (n) => toNum(n,0).toLocaleString("no-NO");
+const round5 = (n) => Math.round(n/5)*5;
+
+function safeRead(file, kind="text"){
+  try{
+    const raw = fs.readFileSync(file,"utf8");
+    if (kind==="json") return JSON.parse(raw);
+    if (kind==="yaml") return yaml.load(raw);
+    return raw;
+  }catch{ return null; }
 }
 
-/* ---------------------------- Load data ----------------------------------- */
-function loadData() {
+/* ------------------------------------------------------- */
+/*  Data: FAQ + pris                                       */
+/* ------------------------------------------------------- */
+function loadData(){
   const faqCandidates = [
     path.join(__dirname, "..", "data", "faq.yaml"),
     path.join(__dirname, "..", "knowledge", "faq_round1.yml"),
@@ -46,273 +42,147 @@ function loadData() {
   ];
   let faq = [];
   let prices = {};
-  const tried = [];
-  const loaded = [];
-
-  for (const p of faqCandidates) {
-    const isLuna = p.endsWith("luna.yml");
-    const exists = fs.existsSync(p);
-    tried.push({ path: p, exists, size: exists ? fs.statSync(p).size : 0 });
-    if (!exists) continue;
-    const parsed = safeRead(p, "yaml");
+  for (const p of faqCandidates){
+    if (!fs.existsSync(p)) continue;
+    const parsed = safeRead(p,"yaml");
     if (!parsed) continue;
-    loaded.push({ path: p, size: fs.statSync(p).size });
-
-    if (isLuna) {
-      const fromLunaFaq =
-        Array.isArray(parsed?.faq) ? parsed.faq :
-        Array.isArray(parsed?.knowledge?.faq) ? parsed.knowledge.faq : [];
-      if (fromLunaFaq?.length) faq = faq.concat(fromLunaFaq);
-
-      const fromLunaPrices = parsed?.priser || parsed?.prices || parsed?.company?.prices;
-      if (fromLunaPrices && typeof fromLunaPrices === "object") {
-        prices = { ...prices, ...fromLunaPrices };
-      }
-    } else {
-      const items = Array.isArray(parsed) ? parsed : (parsed?.faq || []);
-      if (items?.length) faq = faq.concat(items);
+    if (p.endsWith("luna.yml")){
+      const f = Array.isArray(parsed?.faq) ? parsed.faq :
+                Array.isArray(parsed?.knowledge?.faq) ? parsed.knowledge.faq : [];
+      if (f?.length) faq = faq.concat(f);
+      const pr = parsed?.priser || parsed?.prices || parsed?.company?.prices;
+      if (pr && typeof pr==="object") prices = { ...prices, ...pr };
+    }else{
+      const f = Array.isArray(parsed) ? parsed : (parsed?.faq || []);
+      if (f?.length) faq = faq.concat(f);
     }
   }
-
-  const priceJson = safeRead(path.join(__dirname, "..", "data", "priser.json"), "json");
-  if (priceJson && typeof priceJson === "object") {
-    prices = { ...prices, ...priceJson };
-    loaded.push({ path: "priser.json", size: JSON.stringify(priceJson).length });
-  }
-  return { faq, prices, tried, loaded };
+  const pjson = safeRead(path.join(__dirname,"..","data","priser.json"),"json");
+  if (pjson && typeof pjson==="object") prices = { ...prices, ...pjson };
+  return { faq, prices };
 }
 
-/* ---------------------------- Simple FAQ search --------------------------- */
-function normalize(s = "") {
-  return (s + "")
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[^\p{Letter}\p{Number}\s]/gu, " ")
-    .replace(/\s+/g, " ")
+/* ------------------------------------------------------- */
+/*  Enkel FAQ-søk                                          */
+/* ------------------------------------------------------- */
+function normalize(s=""){
+  return (s+"").toLowerCase().normalize("NFKD")
+    .replace(/[^\p{Letter}\p{Number}\s]/gu," ")
+    .replace(/\s+/g," ")
     .trim();
 }
-function jaccard(aTokens, bTokens) {
+function jaccard(aTokens,bTokens){
   if (!aTokens.length || !bTokens.length) return 0;
-  const a = new Set(aTokens);
-  const b = new Set(bTokens);
-  const inter = [...a].filter(x => b.has(x)).length;
-  const uni = new Set([...a, ...b]).size;
-  return inter / uni;
+  const a = new Set(aTokens), b = new Set(bTokens);
+  const inter = [...a].filter(x=>b.has(x)).length;
+  const uni = new Set([...a,...b]).size;
+  return inter/uni;
 }
-function simpleSearch(userMessage, faqArray, minScore = 0.65) {
-  const qNorm   = normalize(userMessage);
+function simpleSearch(userMessage, faqArray, minScore=0.65){
+  const qNorm = normalize(userMessage);
   const qTokens = qNorm.split(" ");
-  let best = null;
-
-  for (const item of faqArray || []) {
-    const candidates = [item.q, ...(item.alt || [])]
-      .map(normalize)
-      .filter(Boolean);
-
+  let best=null;
+  for (const item of faqArray||[]){
+    const candidates = [item.q, ...(item.alt||[])].map(normalize).filter(Boolean);
     let bestLocal = 0;
-    for (const cand of candidates) {
+    for (const cand of candidates){
       const score = jaccard(qTokens, cand.split(" "));
       if (score > bestLocal) bestLocal = score;
     }
     if (!best || bestLocal > best.score) best = { item, score: bestLocal };
   }
-  if (best && best.score >= minScore) {
-    return [{ a: best.item.a, score: best.score, q: best.item.q }];
-  }
+  if (best && best.score>=minScore) return [{ a: best.item.a, score: best.score, q: best.item.q }];
   return [];
 }
 
-/* ========================================================================== */
-/* Language helpers (norske tallord)                                          */
-/* ========================================================================== */
+/* ------------------------------------------------------- */
+/*  Tallord (norsk)                                        */
+/* ------------------------------------------------------- */
 const NO_WORDNUM = {
-  "null":0,"en":1,"ett":1,"ei":1,"to":2,"tre":3,"fire":4,"fem":5,"seks":6,"sju":7,"syv":7,
-  "åtte":8,"ni":9,"ti":10,"elleve":11,"tolv":12,"tretten":13,"fjorten":14,"femten":15,
-  "seksten":16,"sytten":17,"atten":18,"nitten":19,"tjue":20
+  "null":0,"en":1,"ett":1,"ei":1,"to":2,"tre":3,"fire":4,"fem":5,"seks":6,"sju":7,"syv":7,"åtte":8,"ni":9,"ti":10,
+  "elleve":11,"tolv":12,"tretten":13,"fjorten":14,"femten":15,"seksten":16,"sytten":17,"atten":18,"nitten":19,"tjue":20
 };
 function wordToNum(w){
   const k = (w||"").toLowerCase().normalize("NFKD").replace(/[^a-zæøå]/g,"");
-  return Object.prototype.hasOwnProperty.call(NO_WORDNUM, k) ? NO_WORDNUM[k] : null;
+  return Object.prototype.hasOwnProperty.call(NO_WORDNUM,k) ? NO_WORDNUM[k] : null;
 }
 
-/* ========================================================================== */
-/* Parsere for tid, ruller, mm                                               */
-/* ========================================================================== */
+/* ------------------------------------------------------- */
+/*  Felles trekk (minutter / ruller)                       */
+/* ------------------------------------------------------- */
 function extractMinutes(text=""){
-  const m = (text||"").toLowerCase();
-  const mm = m.match(/(\d{1,4})\s*(min|minutt|minutter)\b/);
-  const hh = m.match(/(\d{1,3})\s*(t|time|timer)\b/);
+  const t = (text||"").toLowerCase();
+  const mm = t.match(/(\d{1,4})\s*(min|minutt|minutter)\b/);
+  const hh = t.match(/(\d{1,3}(?:[.,]\d)?)\s*(t|time|timer)\b/);
   if (mm) return toInt(mm[1]);
-  if (hh) return toInt(hh[1]) * 60;
-  const wm = m.match(/([a-zæøå]+)\s*(min|minutt|minutter)\b/);
-  const wh = m.match(/([a-zæøå]+)\s*(t|time|timer)\b/);
-  if (wm){ const n = wordToNum(wm[1]); if(n!=null) return n; }
-  if (wh){ const n = wordToNum(wh[1]); if(n!=null) return n*60; }
+  if (hh) return Math.round(parseFloat(hh[1].replace(",", ".")) * 60);
+  const wm = t.match(/([a-zæøå]+)\s*(min|minutt|minutter)\b/);
+  const wh = t.match(/([a-zæøå]+)\s*(t|time|timer)\b/);
+  if (wm){ const n = wordToNum(wm[1]); if (n!=null) return n; }
+  if (wh){ const n = wordToNum(wh[1]); if (n!=null) return n*60; }
   return null;
 }
 function extractRuller(text=""){
-  const m = (text||"").toLowerCase();
-  const rd = m.match(/(\d{1,3})\s*(rull|ruller)\b/);
-  if (rd) return toInt(rd[1]);
-  const rw = m.match(/([a-zæøå]+)\s*(rull|ruller)\b/);
-  if (rw){ const n = wordToNum(rw[1]); if(n!=null) return n; }
+  const t = (text||"").toLowerCase();
+  const d = t.match(/(\d{1,3})\s*(rull|ruller|spole|spoler)\b/);
+  if (d) return toInt(d[1]);
+  const w = t.match(/([a-zæøå]+)\s*(rull|ruller|spole|spoler)\b/);
+  if (w){ const n = wordToNum(w[1]); if (n!=null) return n; }
   return null;
 }
-function minutesFromUserHistory(history=[]){
-  for (let i=history.length-1; i>=0; i--){
-    const h=history[i];
-    if (h?.role !== "user") continue;
-    const n = extractMinutes(h?.content||"");
-    if (n != null) return n;
+
+/* ------------------------------------------------------- */
+/*  Smalfilm: diameter → minutter                          */
+/*  Tabell: 8 mm og Super 8 har ulik typisk spilletid      */
+/* ------------------------------------------------------- */
+const DIAM_TABLE = {
+  "8mm": {
+    7.5: 4, 12.7: 16, 14.5: 22, 17: 32
+  },
+  "s8": {
+    7.5: 4, 12.7: 12, 14.5: 18, 17: 24
   }
-  return null;
-}
-
-/* ========================================================================== */
-/* Domene‐spesifikke intents                                                 */
-/* ========================================================================== */
-
-/* ---------- Film format aliaser ---------- */
-const S8_RE       = /\b(s-?8|super\s*8|super8)\b/i;
-const EIGHT_RE    = /\b(8\s*mm|8mm|dobbel\s*8|d8|regular\s*8)\b/i;
-const SIXTEEN_RE  = /\b(16\s*mm|16mm)\b/i;
-
-/* ---------- Diameter → minutter (tommelregler) ---------- */
-const MAP_MIN_S8  = { 7.5: 4, 12.7: 12, 14.5: 18, 17: 24 };
-const MAP_MIN_R8  = { 7.5: 4, 12.7: 16, 14.5: 22, 17: 32 };
-const DIAM_KEYS   = [7.5, 12.7, 14.5, 17];
-
-function nearestStdDiameter(cm) {
-  const v = Number(String(cm).replace(",", "."));
-  let best = DIAM_KEYS[0], d = Infinity;
-  for (const k of DIAM_KEYS) {
-    const diff = Math.abs(v - k);
-    if (diff < d) { d = diff; best = k; }
+};
+function nearestKey(num, keys){
+  // matcher 12, 12.7, 12,8 osv til nærmeste «offisielle» diameter
+  const x = Number(num);
+  let best = keys[0], bestDiff = Math.abs(x-keys[0]);
+  for (const k of keys){
+    const d = Math.abs(x-k);
+    if (d < bestDiff){ best = k; bestDiff = d; }
   }
   return best;
 }
-function parseS8Diameters(text) {
-  const cmMatches = [...text.matchAll(/(\d{1,2}(?:[.,]\d)?)\s*cm/gi)].map(m => m[1]);
-  return cmMatches.map(nearestStdDiameter);
-}
-function parseMinutesLoose(text) {
-  const m = text.match(/(\d{1,4})(?:[.,](\d))?\s*(min|minutt|minutter)\b/i);
-  if (!m) return null;
-  const whole = parseInt(m[1], 10);
-  const frac  = m[2] ? parseInt(m[2],10)/10 : 0;
-  return whole + frac;
-}
-function parseSound16(text) {
-  if (/optisk/i.test(text)) return "optisk";
-  if (/magnet/i.test(text)) return "magnetisk";
-  return null;
-}
-function estimateMinutesFromDiameters(diams = [], isSuper8 = true) {
-  const map = isSuper8 ? MAP_MIN_S8 : MAP_MIN_R8;
-  return diams.reduce((sum, d) => sum + (map[d] || 0), 0);
-}
-
-/* ---------- Kjøpsintents ---------- */
-const PURCHASE_WORDS = [
-  "kjøpe","kjøp","selger dere","kan jeg kjøpe","bestille",
-  "pris på usb","minnepenn","ramme","rammer","fotoutskrift","print",
-  "fine art","papir","tomme videokassetter","tom kassett","blank kassett","dvd-plater","cd-plater"
-];
-function looksLikePurchase(msg=""){
-  const m = msg.toLowerCase();
-  return PURCHASE_WORDS.some(w => m.includes(w));
-}
-function mentionsAny(msg="", words=[]){
-  const m = msg.toLowerCase();
-  return words.some(w => m.includes(w));
-}
-function handlePurchaseIntent(message, prices={}){
-  if (!looksLikePurchase(message)) return null;
-  const m = message.toLowerCase();
-  const usbMin = Number(prices?.usb_min_price ?? prices?.minnepenn ?? 295);
-
-  if (mentionsAny(m, ["tom kassett","tomme videokassetter","blank kassett","videokassetter","vhs-kassett"])
-      && !mentionsAny(m, ["minnepenn","usb"])) {
-    return {
-      answer:
-        "Vi selger ikke tomme video-/VHS-kassetter. Vi digitaliserer derimot eksisterende opptak. " +
-        "Til lagring selger vi USB/minnepenner i flere størrelser (fra ca. " + usbMin + " kr), " +
-        "og vi tilbyr også fotoutskrifter i fine-art-kvalitet og rammer. Si gjerne hva du ønsker å kjøpe.",
-      source: "AI"
-    };
+function minutesFromDiamList(list, fmt="s8"){
+  // list: array med diametre i cm (number)
+  const tbl = fmt==="8mm" ? DIAM_TABLE["8mm"] : DIAM_TABLE["s8"];
+  const keys = Object.keys(tbl).map(Number);
+  let total = 0;
+  for (const d of list){
+    const k = nearestKey(d, keys);
+    total += tbl[k];
   }
-  if (mentionsAny(m, ["usb","minnepenn","minnepenner","memory stick"])) {
-    return {
-      answer:
-        "Ja, vi selger USB/minnepenner i ulike størrelser (god kvalitet, 10 års garanti). Pris fra ca. " +
-        usbMin + " kr. Si gjerne hvor mye lagringsplass du trenger (for eksempel 32/64/128 GB).",
-      source: "AI"
-    };
+  return total; // minutter
+}
+
+/* ------------------------------------------------------- */
+/*  Historikk: siste brukerinnlegg om smalfilm             */
+/* ------------------------------------------------------- */
+function historyHasSmalfilm(history=[]){
+  for (let i=history.length-1; i>=0; i--){
+    const h = history[i]; if (h?.role!=="user") continue;
+    const t = (h.content||"").toLowerCase();
+    if (/(smalfilm|super\s*8|super8|s8|8\s*mm|16\s*mm)/.test(t)) return true;
   }
-  if (mentionsAny(m, ["fotoutskrift","print","fine art","papir","ramme","rammer"])) {
-    return {
-      answer:
-        "Ja, vi tilbyr fotoutskrifter i fine-art-kvalitet og rammer. Oppgi ønsket størrelse og antall (for eksempel 30×40 cm, 5 stk), så gir vi pris og leveringstid.",
-      source: "AI"
-    };
-  }
-  return {
-    answer:
-      "Vi har et begrenset utvalg produkter for salg: USB/minnepenner, fotoutskrifter i fine-art-kvalitet og rammer. " +
-      "Fortell hva du ønsker (type, størrelse/kapasitet og antall), så hjelper jeg med pris og levering.",
-    source: "AI"
-  };
+  return false;
 }
 
-/* ---------- Reparasjon av kassetter ---------- */
-const REPAIR_RE = /(reparer|reparasjon|fikse|fix|ordne)\s*(av)?\s*(kassett|kassetter|videokassett|videobånd|minidv|hi8|video8|vhsc|vhs)/i;
-function handleRepairIntent(message) {
-  if (!REPAIR_RE.test(message)) return null;
-  return {
-    answer:
-      "Ja, vi reparerer videokassetter (VHS, VHS-C, Video8/Hi8, MiniDV m.fl.). " +
-      "Typisk inkluderer det skjøting av avrevne bånd, bytte av skall og utbedring av fastkjørt bånd. " +
-      "Etter reparasjon kan vi også digitalisere innholdet. Ta kontakt på 33 74 02 80 eller kontakt@lunamedia.no for vurdering og pris.",
-    source: "FAQ"
-  };
-}
-
-/* ---------- Levering / henting ---------- */
-const DELIVERY_RE = /(hvordan|hvor)\s+(kan\s+)?(jeg\s+)?(levere|sende|levering)|norgespakke|hente/i;
-function handleDeliveryIntent(message) {
-  if (!DELIVERY_RE.test(message)) return null;
-  const answer = [
-    "Du kan sende pakken med Norgespakke med sporing til:",
-    "Luna Media, Pb. 60, 3107 Sem (bruk mottakers mobil 997 05 630).",
-    "",
-    "Du kan også levere direkte:",
-    "- Sem Senteret (2. etg.), Andebuveien 3, 3170 Sem",
-    "- Desk på Bislett i Oslo (Sofies gate 66A) – etter avtale",
-    "",
-    "Ring 33 74 02 80 eller skriv til kontakt@lunamedia.no for å avtale levering/henting. Henting kan avtales i nærområdet ved behov (f.eks. Drammen)."
-  ].join("\n");
-  return { answer, source: "FAQ" };
-}
-
-/* ---------- Mixed S8/8mm + 16mm intro ---------- */
-function handleMixedFilmIntro(message) {
-  const hasS8or8 = S8_RE.test(message) || EIGHT_RE.test(message) || /\bs8\b/i.test(message);
-  const has16    = SIXTEEN_RE.test(message);
-  if (!hasS8or8 || !has16) return null;
-  const answer =
-    "Ja – vi tar begge deler.\n\n" +
-    "• S8/8 mm: Oppgi diameter per rull (7,5 / 12,7 / 14,5 / 17 cm) og om det er 8 mm eller Super 8.\n" +
-    "• 16 mm: Oppgi minutter (eller meter) per rull og om lyden er optisk eller magnetisk.\n\n" +
-    "Skriv for eksempel: «S8: 2 ruller, 12,7 cm og 14,5 cm (Super 8). 16 mm: 3 ruller, 24 min, optisk lyd».";
-  return { answer, source: "AI" };
-}
-
-/* ========================================================================== */
-/* Priser                                                                      */
-/* ========================================================================== */
+/* ------------------------------------------------------- */
+/*  Prisregler                                             */
+/* ------------------------------------------------------- */
 function smalfilmDiscount(totalMinutes){
-  if (totalMinutes >= 360) return 0.20;         // ≥ 6 timer
-  if (totalMinutes >= 181) return 0.10;         // > 3 timer (presis >180)
+  if (totalMinutes >= 360) return 0.20;        // ≥6 t
+  if (totalMinutes > 180)  return 0.10;        // >3 t
   return 0;
 }
 function priceSmalfilm(minutter, ruller, prices){
@@ -322,34 +192,29 @@ function priceSmalfilm(minutter, ruller, prices){
 
   if (minutter == null){
     const txt = [
-      "Smalfilm prises med ca. " + perMin + " kr per minutt + " + startGeb + " kr i startgebyr per rull.",
-      "Vi gir 10% rabatt når samlet spilletid er over 3 timer, og 20% rabatt over 6 timer.",
-      "Oppgi antall minutter og ruller for et konkret prisestimat. USB/minnepenn kommer i tillegg (fra " + usbMin + " kr).",
-      "Det vil alltid være noen usikre variabler i utregning av lengde på smalfilm hvis du ikke vet dette eksakt. " +
-        "Betrakt derfor svaret som et estimat – kontakt oss gjerne for et sikrere estimat/tilbud."
+      `Smalfilm prises med ca. ${perMin} kr per minutt + ${startGeb} kr i startgebyr per rull.`,
+      `Vi gir 10% rabatt når samlet spilletid er over 3 timer, og 20% rabatt over 6 timer.`,
+      `Oppgi minutter og ruller, eller diameter per rull (7,5 / 12,7 / 14,5 / 17 cm) for et konkret estimat.`,
+      `USB/minnepenn i tillegg (fra ${usbMin} kr).`,
+      `Det vil alltid være litt usikkerhet når lengde anslås – ta svaret som et estimat.`
     ].join(" ");
     return { answer: txt, source: "Pris" };
   }
 
-  const mins  = Math.max(0, toInt(minutter));
+  const mins = Math.max(0, toInt(minutter));
   const rolls = ruller != null ? Math.max(1, toInt(ruller)) : 1;
 
-  const disc   = smalfilmDiscount(mins);
+  const disc = smalfilmDiscount(mins);
   const arbeid = mins * perMin * (1 - disc);
   const start  = rolls * startGeb;
   const total  = round5(arbeid + start);
 
-  let out =
-    "For " + mins + " minutter smalfilm og " + rolls + " " + (rolls===1?"rull":"ruller") +
-    " er prisen ca " + nok(total) + " kr.";
-  if (disc>0) out += " (Rabatt er inkludert: " + (disc*100).toFixed(0) + "% for " + (mins/60).toFixed(1) + " timer totalt.)";
-  out += " USB/minnepenn kommer i tillegg (fra " + usbMin + " kr). " +
-         "Betrakt svaret som et estimat hvis lengden ikke er helt sikker.";
-
+  let out = `For ${mins} minutter smalfilm og ${rolls} ${rolls===1?"rull":"ruller"} er prisen ca ${nok(total)} kr.`;
+  if (disc>0) out += ` (Rabatt inkludert: ${(disc*100).toFixed(0)}%.)`;
+  out += ` USB/minnepenn i tillegg (fra ${usbMin} kr). Det er alltid litt usikkerhet ved anslag – ta dette som et estimat.`;
   return { answer: out, source: "Pris" };
 }
 
-/* Video (VHS/Hi8/Video8/MiniDV) */
 function parseVideoIntent(text=""){
   const m = text.toLowerCase();
   if (!/(vhs|videokassett|videobånd|hi8|video8|minidv|vhsc)/.test(m)) return null;
@@ -363,200 +228,284 @@ function priceVideo({minutter, kassetter}, prices){
   const usbMin  = toNum(prices.usb_min_price ?? prices.minnepenn ?? 295);
 
   if (minutter != null){
-    const min = Math.max(0, toInt(minutter));
-    const hrs = min/60;
+    const hrs = Math.max(0, toInt(minutter))/60;
     let disc = 0;
     if (hrs >= 20) disc = 0.20;
     else if (hrs >= 10) disc = 0.10;
     const total = round5(hrs * perTime * (1 - disc));
-    let txt = "Video prises pr time digitalisert opptak (" + perTime + " kr/time). For " +
-              hrs.toFixed(1) + " timer blir prisen ca " + nok(total) + " kr.";
-    if (disc>0) txt += " (Inkluderer " + (disc*100).toFixed(0) + "% rabatt.)";
-    txt += " USB/minnepenn kommer i tillegg (fra " + usbMin + " kr).";
+    let txt = `Video prises per time (${perTime} kr/time). For ${hrs.toFixed(1)} timer blir prisen ca ${nok(total)} kr.`;
+    if (disc>0) txt += ` (Inkluderer ${(disc*100).toFixed(0)}% rabatt.)`;
+    txt += ` USB/minnepenn i tillegg (fra ${usbMin} kr).`;
     return { answer: txt, source: "Pris" };
   }
 
   if (kassetter != null){
     const k = Math.max(1, toInt(kassetter));
-    const lowH = k * 1.0, highH = k * 2.0; // 60–120 min pr kassett (anslag)
-    const lowDisc  = lowH  >= 20 ? 0.20 : (lowH  >= 10 ? 0.10 : 0);
-    const highDisc = highH >= 20 ? 0.20 : (highH >= 10 ? 0.10 : 0);
-    const low  = round5(lowH  * perTime * (1 - lowDisc));
-    const high = round5(highH * perTime * (1 - highDisc));
-    const txt =
-      "Vi priser per time digitalisert video (" + perTime + " kr/time). " +
-      k + " " + (k===1?"kassett":"kassetter") + " kan typisk være " + lowH.toFixed(1) + "–" + highH.toFixed(1) + " timer " +
-      "⇒ ca " + nok(low) + "–" + nok(high) + " kr (inkl. ev. volumrabatt). " +
-      "Oppgi gjerne total spilletid for et mer presist estimat. USB/minnepenn i tillegg (fra " + usbMin + " kr).";
+    const lowH= k*1.0, highH=k*2.0;
+    const lowDisc  = lowH>=20?0.20:(lowH>=10?0.10:0);
+    const highDisc = highH>=20?0.20:(highH>=10?0.10:0);
+    const low  = round5(lowH*perTime*(1-lowDisc));
+    const high = round5(highH*perTime*(1-highDisc));
+    const txt = [
+      `Vi priser per time (${perTime} kr/time).`,
+      `${k} ${k===1?"kassett":"kassetter"} kan typisk være ${lowH.toFixed(1)}–${highH.toFixed(1)} timer`,
+      `⇒ ca ${nok(low)}–${nok(high)} kr (inkl. ev. volumrabatt).`,
+      `USB/minnepenn i tillegg (fra ${usbMin} kr).`
+    ].join(" ");
     return { answer: txt, source: "Pris" };
   }
 
+  return { answer: `Video prises per time (${perTime} kr/time). Oppgi total spilletid, så regner jeg estimat. USB/minnepenn i tillegg (fra ${usbMin} kr).`, source: "Pris" };
+}
+
+/* ------------------------------------------------------- */
+/*  Kjøp/produkt + reparasjon + levering/henting           */
+/* ------------------------------------------------------- */
+function cassetteRepairIntent(msg){
+  const m = msg.toLowerCase();
+  if (!/(reparer|fikse|ødelagt).*(kassett|videobånd|vhs|minidv|hi8|video8)/.test(m)) return null;
   return {
-    answer: "Video prises pr time (" + perTime + " kr/time). Oppgi gjerne total spilletid (timer/minutter), så regner jeg et konkret estimat. USB/minnepenn i tillegg (fra " + usbMin + " kr).",
-    source: "Pris"
+    answer: "Ja – vi reparerer kassetter (VHS, MiniDV, Hi8/Video8 m.m.) og kan deretter digitalisere innholdet. Ta kontakt på 33 74 02 80 eller kontakt@lunamedia.no for å avtale innlevering.",
+    source: "AI"
   };
 }
 
-/* ========================================================================== */
-/* Handler                                                                     */
-/* ========================================================================== */
+function deliveryIntent(msg){
+  const m = msg.toLowerCase();
+  if (!/(levere|levering|hvordan.*levere|kan dere hente|hente.*(drammen|oslo|vestfold|tonsberg|tønsberg|sandefjord|larvik)|frakt|post)/.test(m)) return null;
+
+  // Drammen/henting-spørsmål
+  if (/hente/.test(m)){
+    return {
+      answer: "Det kan hende vi kan hente materialet hos deg. Ta kontakt på 33 74 02 80 eller kontakt@lunamedia.no, så finner vi en god løsning.",
+      source: "AI"
+    };
+  }
+
+  const text = [
+    "Du kan sende pakken med Norgespakke med sporing til:",
+    "Luna Media, Pb. 60, 3107 Sem (bruk mottakers mobil 997 05 630).",
+    "",
+    "Du kan også levere direkte:",
+    "- Sem Senteret (2. etg.), Andebuveien 3, 3170 Sem",
+    "- Desk på Bislett i Oslo (Sofies gate 66A) – etter avtale",
+    "",
+    "Ring 33 74 02 80 eller skriv til kontakt@lunamedia.no for å avtale levering/henting."
+  ].join("\n");
+  return { answer: text, source: "AI" };
+}
+
+/* ------------------------------------------------------- */
+/*  Smalfilm-veileder og oppfølging                        */
+/* ------------------------------------------------------- */
+function isSmalfilmContext(msg){
+  const m = msg.toLowerCase();
+  return /(smalfilm|super\s*8|super8|\bs8\b|8\s*mm|16\s*mm)/.test(m);
+}
+
+function smalfilmGuideIntent(msg){
+  if (!isSmalfilmContext(msg)) return null;
+  return {
+    answer: [
+      "Ja – vi tar både S8/8 mm og 16 mm.",
+      "For S8/8 mm: oppgi diameter per rull (7,5 / 12,7 / 14,5 / 17 cm) og om det er 8 mm eller Super 8.",
+      "For 16 mm: oppgi minutter (eller meter) per rull og om lyden er optisk eller magnetisk.",
+      "Skriv for eksempel: «S8: 2 ruller, 12,7 cm og 14,5 cm. 16 mm: 3 ruller, 24 min, optisk lyd».",
+      "Så estimerer jeg total spilletid og pris."
+    ].join(" "),
+    source: "AI"
+  };
+}
+
+// Fanger opp oppfølging som inneholder diametre/minutter for s8/8mm og 16 mm
+function parseFollowupSmalfilm(msg, prices){
+  const m = msg.toLowerCase();
+  if (!/(s8|super\s*8|8\s*mm|16\s*mm)/.test(m)) return null;
+
+  // Finn S8/8mm-del
+  // Eksempel: "s8: 2 ruller 12 cm og 14 cm" / "super 8: ...", "8 mm: ..."
+  const s8Block = m.match(/(s8|super\s*8|8\s*mm)\s*:\s*([^\.]+)/);
+  let s8Min = 0, s8Ruller = 0;
+
+  if (s8Block){
+    const fmt = /8\s*mm/.test(s8Block[1]) ? "8mm" : "s8";
+    const diamStr = s8Block[2];
+    // trekk rull-antall om oppgitt eksplisitt
+    const explicitCount = extractRuller(diamStr);
+    // finn alle tall som kan være diameter: 7.5, 12, 12.7, 14.5, 17, 17.3 osv
+    const diams = (diamStr.match(/(\d{1,2}(?:[.,]\d)?)/g) || [])
+      .map(x => parseFloat(x.replace(",", ".")))
+      .filter(x => x>0 && x<=40);
+
+    if (diams.length){
+      s8Min = minutesFromDiamList(diams, fmt);
+      s8Ruller = explicitCount || diams.length;
+    }
+  }
+
+  // Finn 16mm-del
+  // Eksempel: "16 mm: 3 ruller 1,5 time optisk lyd" eller "16 mm: 35 min optisk"
+  const mm16Block = m.match(/16\s*mm\s*:\s*([^\.]+)/);
+  let mm16Min = 0, mm16Ruller = 0, mm16Lyd = "uten lyd";
+  if (mm16Block){
+    const part = mm16Block[1];
+    const r = extractRuller(part);
+    if (r!=null) mm16Ruller = r;
+    const mins = extractMinutes(part);
+    if (mins!=null) mm16Min = mins;
+    if (/optisk/.test(part)) mm16Lyd = "optisk";
+    else if (/magnetisk/.test(part)) mm16Lyd = "magnetisk";
+  }
+
+  if (s8Min===0 && mm16Min===0) return null; // ingen nyttig info
+
+  // Pris for S8/8mm (bruk generell smalfilmpris – per min + start per rull + rabatt)
+  let s8Text = "";
+  if (s8Min>0){
+    const s8Price = priceSmalfilm(s8Min, s8Ruller||1, prices);
+    s8Text = s8Price.answer;
+  }
+
+  // Pris for 16mm – bruk særregler hvis du har lagt dem i priser.json,
+  // ellers fall tilbake til samme som smalfilm.
+  let mm16Text = "";
+  if (mm16Min>0){
+    const p = priceSmalfilm(mm16Min, mm16Ruller||1, prices);
+    if (mm16Lyd==="optisk") {
+      mm16Text = p.answer + " (Oppgitt: optisk lyd.)";
+    } else if (mm16Lyd==="magnetisk"){
+      mm16Text = p.answer + " (Oppgitt: magnetisk lyd.)";
+    } else {
+      mm16Text = p.answer;
+    }
+  }
+
+  const out = [s8Text, mm16Text].filter(Boolean).join(" ");
+  if (!out) return null;
+
+  return { answer: out, source: "Pris" };
+}
+
+/* ------------------------------------------------------- */
+/*  HTTP-handler                                           */
+/* ------------------------------------------------------- */
 export default async function handler(req, res){
-  /* CORS */
+  // CORS
   const allowed = (process.env.LUNA_ALLOWED_ORIGINS || "*").split(",").map(s=>s.trim());
   const origin = req.headers.origin || "";
   if (allowed.includes("*") || allowed.includes(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin || "*");
     res.setHeader("Vary", "Origin");
   }
-  if (req.method === "OPTIONS") {
+  if (req.method === "OPTIONS"){
     res.setHeader("Access-Control-Allow-Methods","POST, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers","Content-Type");
     return res.status(200).end();
   }
-  if (req.method !== "POST") return res.status(405).json({ error:"Method not allowed" });
+  if (req.method !== "POST"){
+    return res.status(405).json({ error:"Method not allowed" });
+  }
 
-  try {
+  try{
     let body = req.body || {};
-    if (typeof body === "string") { try{ body = JSON.parse(body); } catch { body = {}; } }
+    if (typeof body === "string"){
+      try{ body = JSON.parse(body); } catch { body = {}; }
+    }
     const message = (body.message || "").trim();
     const history = Array.isArray(body.history) ? body.history : [];
     const debug   = !!body.debug;
+
     if (!message) return res.status(400).json({ error:"Missing message" });
 
     const { faq, prices } = loadData();
 
-    /* 0) Raskt: reparasjon / levering / kjøp */
-    const repair = handleRepairIntent(message);
-    if (repair) return res.status(200).json(repair);
+    // 0) Reparasjon av kassetter
+    const fix = cassetteRepairIntent(message);
+    if (fix) return res.status(200).json(fix);
 
-    const delivery = handleDeliveryIntent(message);
-    if (delivery) return res.status(200).json(delivery);
+    // 0b) Levering/henting
+    const del = deliveryIntent(message);
+    if (del) return res.status(200).json(del);
 
-    const sales = handlePurchaseIntent(message, prices);
-    if (sales) return res.status(200).json(sales);
-
-    /* 1) FAQ */
-    const kbHits = simpleSearch(message, faq);
-    if (kbHits?.[0]?.a) {
-      return res.status(200).json({ answer: kbHits[0].a, source: "FAQ" });
+    // 1) FAQ
+    const kb = simpleSearch(message, faq);
+    if (kb?.[0]?.a){
+      return res.status(200).json({ answer: kb[0].a, source: "FAQ" });
     }
 
-    /* 1.5) Intro for blandet S8/8mm + 16mm */
-    const mixIntro = handleMixedFilmIntro(message);
-    if (mixIntro) return res.status(200).json(mixIntro);
+    // 1b) Smalfilm veiledning hvis relevant (og ikke allerede ren diam-/min-info)
+    if (isSmalfilmContext(message)){
+      // Forsøk først å tolke en oppfølgingsstreng med konkrete data
+      const follow = parseFollowupSmalfilm(message, prices);
+      if (follow) return res.status(200).json(follow);
 
-    /* 2) Pris-intents: Video først (vhs/hi8 etc.) */
+      // ellers gi veiledning
+      const guide = smalfilmGuideIntent(message);
+      if (guide) return res.status(200).json(guide);
+    }
+
+    // 2) Video (VHS/Hi8/MiniDV) pris
     const vIntent = parseVideoIntent(message);
     if (vIntent){
-      if (vIntent.minutter == null) vIntent.minutter = minutesFromUserHistory(history);
+      if (vIntent.minutter == null){
+        // kanskje nevnt tidligere
+        for (let i=history.length-1; i>=0; i--){
+          const n = extractMinutes(history[i]?.content||"");
+          if (n!=null){ vIntent.minutter = n; break; }
+        }
+      }
       return res.status(200).json( priceVideo(vIntent, prices) );
     }
 
-    /* 2.1) Smalfilm (S8/8mm/16mm – pris på minutter) */
-    const mentionsSmalfilm = /(smalfilm|super\s*8|super8|8\s*mm|8mm|16\s*mm|16mm|s-?8)\b/i.test(message.toLowerCase());
-    if (mentionsSmalfilm){
-      const mins = extractMinutes(message) ?? minutesFromUserHistory(history);
-      const rull = extractRuller(message);
-      const priced = priceSmalfilm(mins, rull, prices);
-      return res.status(200).json(priced);
+    // 3) Smalfilm «vanlig» (minutter+ruller)
+    if (historyHasSmalfilm(history) || isSmalfilmContext(message)){
+      const mins = extractMinutes(message);
+      const rul  = extractRuller(message);
+      const p = priceSmalfilm(mins, rul, prices);
+      return res.status(200).json(p);
     }
 
-    /* 2.2) Oppfølger: hvis kunden svarer med diametre/minutter i fritekst */
-    (function maybeFollowUpFilmParsing(){
-      const lower = message.toLowerCase();
-
-      if (S8_RE.test(lower) || EIGHT_RE.test(lower) || /\bs8\b/i.test(lower)) {
-        const diams = parseS8Diameters(message);
-        if (diams.length >= 1) {
-          const isS8 = S8_RE.test(lower) || /\bs8\b/i.test(lower);
-          const mins = estimateMinutesFromDiameters(diams, isS8);
-          if (mins > 0) {
-            return res.status(200).json({
-              answer:
-                "Basert på diameter " + diams.join(" cm, ") + " cm anslår jeg ca " + mins + " minutter " +
-                (isS8 ? "Super 8" : "8 mm") + ". Oppgi gjerne hvor mange slike ruller du har, så regner jeg total tid og pris.",
-              source: "AI"
-            });
-          }
-          return res.status(200).json({
-            answer:
-              "Kan du oppgi diameter pr rull som 7,5 / 12,7 / 14,5 / 17 cm, og om det er 8 mm eller Super 8? Da anslår jeg minutter og pris.",
-            source: "AI"
-          });
-        }
-      }
-
-      if (SIXTEEN_RE.test(lower)) {
-        const mins = parseMinutesLoose(message);
-        const lyd  = parseSound16(message);
-        if (mins || lyd) {
-          const parts = [];
-          if (mins) parts.push(mins + " minutter");
-          if (lyd)  parts.push(lyd + " lyd");
-          return res.status(200).json({
-            answer:
-              "Notert for 16 mm: " + parts.join(", ") + ". Har du flere ruller eller minuttsum, så kan jeg beregne pris (optisk/magnetisk lyd prises forskjellig).",
-            source: "AI"
-          });
-        }
-      }
-    })();
-
-    /* 3) LLM fallback */
-    const system = [
-      'Du er "Luna" – en vennlig og presis AI-assistent for Luna Media (Vestfold).',
-      "Svar kort på norsk. Bruk priseksempler og FAQ nedenfor når relevant.",
-      "Hvis noe er uklart eller pris mangler: si det, og foreslå tilbud via e-post.",
-      "Tilby menneskelig overtakelse ved spesielle behov.",
-      "Priser (kan være tomt):",
-      JSON.stringify(prices, null, 2)
-    ].join("\n");
-
+    // 4) LLM fallback – kort
     const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
     const model = process.env.LUNA_MODEL || "gpt-4o-mini";
-    const user = `Kunde spør: ${message}\nSvar på norsk, maks 2–3 setninger.`;
+    let answer = "Beklager, jeg er usikker på spørsmålet. Kontakt oss gjerne på kontakt@lunamedia.no eller 33 74 02 80.";
 
-    let answer =
-      "Beklager, jeg har ikke et godt svar på dette akkurat nå. " +
-      "Send oss gjerne en e-post på kontakt@lunamedia.no eller ring 33 74 02 80.";
-
-    if (!OPENAI_API_KEY) {
+    if (!OPENAI_API_KEY){
       return res.status(200).json({ answer, source: "fallback_no_key" });
     }
 
-    try {
+    const system = [
+      'Du er "Luna" – en vennlig og presis assistent for Luna Media (Vestfold).',
+      "Svar kort på norsk. Hvis noe er uklart: si det, og foreslå tilbud via e-post.",
+      "Ved spørsmål om filming/booking: be om dato, sted, tidsrom, ønsket leveranse og e-post."
+    ].join("\n");
+
+    const user = `Kunde spør: ${message}\nSvar kort, maks 2–3 setninger. Ikke bruk markdown-utheving.`;
+
+    try{
       const resp = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${OPENAI_API_KEY}`
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json",
+          "Authorization":`Bearer ${OPENAI_API_KEY}`
         },
         body: JSON.stringify({
-          model,
-          temperature: 0.3,
-          max_tokens: 400,
-          messages: [
-            { role: "system", content: system },
-            ...history,
-            { role: "user", content: user }
-          ]
+          model, temperature:0.3, max_tokens:300,
+          messages: [{ role:"system", content: system }, ...history, { role:"user", content: user }]
         })
       });
-
       const text = await resp.text();
-      let data;
-      try { data = JSON.parse(text); } catch { throw new Error("OpenAI JSON parse error: " + text); }
-      if (!resp.ok) throw new Error(data?.error?.message || ("OpenAI feilkode " + resp.status));
+      let data; try{ data = JSON.parse(text); } catch { throw new Error("OpenAI JSON parse error: " + text); }
+      if (!resp.ok) throw new Error(data?.error?.message || `OpenAI error ${resp.status}`);
       const content = data?.choices?.[0]?.message?.content?.trim();
       if (content) answer = content;
-      return res.status(200).json({ answer, source: "AI" });
-
-    } catch (e) {
-      console.error("OpenAI-kall feilet:", e?.message);
-      return res.status(200).json({ answer, source: "fallback_openai_error" });
+      return res.status(200).json({ answer, source:"AI" });
+    }catch(e){
+      console.error("OpenAI error:", e?.message);
+      return res.status(200).json({ answer, source:"fallback_openai_error" });
     }
 
-  } catch (err){
+  }catch(err){
     console.error("Handler-feil:", err);
     return res.status(500).json({ error:"Server error" });
   }
