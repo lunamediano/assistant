@@ -166,7 +166,7 @@ function historySmalfilm(history=[]){
   return ctx;
 }
 
-/* ============== pris: smalfilm ===================== */
+/* ============== pris: smalfilm (8mm/S8) ============= */
 function smalfilmDiscount(totalMinutes){
   if (totalMinutes >= 360) return 0.20;   // ≥ 6 t
   if (totalMinutes >  180) return 0.10;   // > 3 t
@@ -235,7 +235,7 @@ function priceVideo({minutter, kassetter}, prices){
 
   if (kassetter != null){
     const k = Math.max(1, toInt(kassetter));
-    const lowH = k * 1.0, highH = k * 2.0; // 60–120 min pr kassett
+    const lowH = k * 1.0, highH = k * 2.0;
     const lowDisc  = lowH  >= 20 ? 0.20 : (lowH  >= 10 ? 0.10 : 0);
     const highDisc = highH >= 20 ? 0.20 : (highH >= 10 ? 0.10 : 0);
     const low  = round5(lowH  * perTime * (1 - lowDisc));
@@ -396,7 +396,7 @@ async function handleBookingIntent(message, history){
   return { answer: confirm + (sendRes.ok ? "" : " (E-postvarselet mitt feilet – vi følger opp manuelt.)"), source: "AI" };
 }
 
-/* ======== Smalfilm-lengde intent (diameter/meter) ======== */
+/* ======== Smalfilm-lengde intent (8mm/S8: diameter/meter) ======== */
 function hasLengthWords(s=""){
   const m = (s || "").toLowerCase();
   return /(lengde|lang|min|minutt|minutter|time|timer|cm|meter|m|spol|spole|diameter)/.test(m);
@@ -446,7 +446,6 @@ function estFromMeters(meters, format /* "8mm"|"super8"|null */){
   return { rangeText: `ca ${m8} min (8 mm) / ca ${mS8} min (Super 8)` };
 }
 
-// Hent ALLE diametre i teksten: "12,7 cm, 17 cm", "12 cm og 18 cm", etc.
 function extractAllDiametersCM(text=""){
   const m = (text || "").toLowerCase();
   const out = [];
@@ -459,6 +458,69 @@ function extractAllDiametersCM(text=""){
   return out;
 }
 
+/* ===================== 16 mm intent ===================== */
+function mentions16mm(s=""){ return /(16\s*mm|16mm)/i.test(s||""); }
+function audioType16mm(s=""){
+  const m = (s||"").toLowerCase();
+  if (/optisk/.test(m)) return "optisk";
+  if (/magnetisk/.test(m)) return "magnetisk";
+  return null;
+}
+function price16mm({ minutter, ruller=1, lyd=null }){
+  // Satser fra deg:
+  // Grunn 16mm: 1795 / 20 min => 89.75 kr/min
+  // Startgebyr pr rull: 125
+  // Magnetisk lyd: +200 / 20 min => +10 kr/min
+  // Optisk lyd: 2990 / 20 min => 149.5 kr/min (erstatter grunnpris)
+  const startGeb = 125;
+  const basePerMin = 1795 / 20;      // 89.75
+  const optiskPerMin = 2990 / 20;    // 149.5
+  const magnetAddPerMin = 200 / 20;  // +10
+
+  const mins = Math.max(0, toInt(minutter||0));
+  let perMin = basePerMin;
+  if (lyd === "optisk") perMin = optiskPerMin;
+  if (lyd === "magnetisk") perMin = basePerMin + magnetAddPerMin;
+
+  const arbeid = mins * perMin;
+  const start  = Math.max(1, toInt(ruller)) * startGeb;
+  const total  = round5(arbeid + start);
+
+  let txt = `For ${mins} minutter 16 mm${lyd?` med ${lyd} lyd`:""} og ${ruller} ${ruller==1?"rull":"ruller"} er prisen ca ${nok(total)} kr.`;
+  txt += " USB/minnepenn kommer i tillegg (fra 295 kr).";
+  return { answer: txt, source: "Pris" };
+}
+function handle16mmIntent(message, history){
+  if (!mentions16mm(message)) return null;
+
+  const lyd = audioType16mm(message);
+  const mins = extractMinutes(message);
+  const rull = extractRuller(message) ?? extractRuller((history.slice(-5).map(h=>h.content).join(" "))||"") ?? 1;
+
+  // Hvis minutter er oppgitt -> regn pris
+  if (mins != null){
+    return price16mm({ minutter: mins, ruller: rull, lyd });
+  }
+
+  // Hvis bruker har skrevet bare diametre -> ikke gjett!
+  const hasCM = /(\d{1,2}(?:[.,]\d)?)\s*cm\b/i.test(message);
+  if (hasCM){
+    const text = [
+      "For 16 mm er diameter på spolen dessverre ikke en pålitelig indikator for spilletid (kjerne og filmtykkelse varierer).",
+      "Gi oss gjerne **minutter** eller **meter** per spole – eller et foto av spolekjerne (1”/2”/3”), så anslår vi tid og pris.",
+      "Hvis du vet omtrent hvor mange **meter** du har, kan jeg regne et estimat nå."
+    ].join(" ");
+    return { answer: text, source: "Info" };
+  }
+
+  // Ellers: spør eksplisitt etter minutter/meter
+  return {
+    answer: "Oppgi gjerne hvor mange **minutter** eller **meter** 16 mm-film du har (og antall ruller), så beregner jeg pris. Skriv også gjerne om det er **optisk** eller **magnetisk lyd**.",
+    source: "Info"
+  };
+}
+
+/* ========== Smalfilm-lengde (8mm/S8) handler ========= */
 function handleSmalfilmLengthIntent(message, history, prices){
   const m = (message || "").toLowerCase();
   const mentionsFilm   = smalfilmInText(m) || inSmalfilmContext(history);
@@ -466,11 +528,13 @@ function handleSmalfilmLengthIntent(message, history, prices){
   const mentionsRuller = /(rull|ruller)\b/.test(m);
   if (!mentionsFilm || !(mentionsLen || mentionsRuller)) return null;
 
+  // 16 mm fanges separat (ingen gjetting på diameter)
+  if (mentions16mm(message)) return null;
+
   const isS8 = /(super\s*8|super8|s-?8)/.test(m);
   const is8  = /(8\s*mm|8mm)/.test(m) && !isS8;
   const format = isS8 ? "super8" : (is8 ? "8mm" : null);
 
-  // --- NYTT: flere diametre i samme setning
   const allCM = extractAllDiametersCM(m);
   if (allCM.length >= 1){
     let perRoll = [];
@@ -485,24 +549,15 @@ function handleSmalfilmLengthIntent(message, history, prices){
         perRoll.push(`${d} cm → ${est.rangeText}`);
       }
     }
-
     if (perRoll.length){
-      // Hvis vi har bestemt en total i minutter: gi også pris (antall ruller = antall diametre)
       if (totalMin > 0){
         const price = priceSmalfilm(totalMin, allCM.length, prices).answer;
-        return {
-          answer: `Per rull: ${perRoll.join("; ")}. ${price}`,
-          source: "Info"
-        };
+        return { answer: `Per rull: ${perRoll.join("; ")}. ${price}`, source: "Info" };
       }
-      return {
-        answer: `Per rull: ${perRoll.join("; ")}. Oppgi gjerne hvor mange slike spoler du har, så anslår jeg total spilletid og pris.`,
-        source: "Info"
-      };
+      return { answer: `Per rull: ${perRoll.join("; ")}. Oppgi hvor mange slike spoler du har, så anslår jeg total spilletid og pris.`, source: "Info" };
     }
   }
 
-  // Én diameter eller meter i teksten?
   const cmMatch = m.match(/(\d{1,2}(?:[.,]\d)?)\s*cm/);
   const mMatch  = m.match(/(\d{1,3})\s*(?:m|meter)\b/);
 
@@ -524,7 +579,7 @@ function handleSmalfilmLengthIntent(message, history, prices){
       }
     }
     if (est?.rangeText){
-      return { answer: `Det tilsvarer ${est.rangeText}. Oppgi gjerne hvor mange slike spoler du har, så anslår jeg total spilletid og pris.`, source:"Info" };
+      return { answer: `Det tilsvarer ${est.rangeText}. Oppgi hvor mange slike spoler du har, så anslår jeg total spilletid og pris.`, source:"Info" };
     }
   }
 
@@ -581,11 +636,15 @@ export default async function handler(req, res){
     const salesHit = handlePurchaseIntent(message, prices);
     if (salesHit) return res.status(200).json(salesHit);
 
-    // 3) Smalfilm-lengde (diameter/meter) – nå også SUM av flere diametre
+    // 3) 16 mm (egen intent før smalfilm/diameter)
+    const mm16 = handle16mmIntent(message, history);
+    if (mm16) return res.status(200).json(mm16);
+
+    // 4) Smalfilm-lengde (8mm/S8)
     const lenHit = handleSmalfilmLengthIntent(message, history, prices);
     if (lenHit) return res.status(200).json(lenHit);
 
-    // 4) Pris-intents
+    // 5) Pris-intents
     const vIntent = parseVideoIntent(message);
     if (vIntent){
       if (vIntent.minutter == null) vIntent.minutter = minutesFromUserHistory(history);
@@ -601,11 +660,11 @@ export default async function handler(req, res){
       return res.status(200).json( priceSmalfilm(minutter, ruller, prices) );
     }
 
-    // 5) Booking-intent
+    // 6) Booking-intent
     const bookingHit = await handleBookingIntent(message, history);
     if (bookingHit) return res.status(200).json(bookingHit);
 
-    // 6) LLM fallback
+    // 7) LLM fallback
     const system = [
       'Du er "Luna" – en vennlig og presis AI-assistent for Luna Media (Vestfold).',
       "Svar kort på norsk. Bruk priseksempler og FAQ når relevant.",
