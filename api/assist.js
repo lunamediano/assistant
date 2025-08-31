@@ -235,37 +235,62 @@ function parseVideoIntent(text=""){
   return { minutter: minutes, kassetter };
 }
 
-function priceVideo({minutter,kassetter},prices){
-  const perTime=toNum(prices.vhs_per_time ?? prices.video_per_time ?? prices.vhs_per_time_kr ?? 315);
-  const usbMin =toNum(prices.usb_min_price ?? prices.minnepenn ?? 295);
+// --- ERSTATT HELE DENNE FUNKSJONEN ---
+function priceVideo({ minutter, kassetter }, prices) {
+  // Tåler både tall og strenger som "315 kr"
+  let perTime = toNum(prices.vhs_per_time, 0);
+  if (!perTime) perTime = toNum(prices.video_per_time, 0);
+  if (!perTime) perTime = toInt(prices.vhs_per_time_kr, 0);
+  if (!perTime) perTime = 315; // siste fallback
 
-  if(minutter != null){
-    const min=Math.max(0,toInt(minutter));
-    const hrs=min/60;
-    let disc=0; if(hrs >= 20) disc=0.20; else if(hrs >= 10) disc=0.10;
-    const total=round5(hrs*perTime*(1-disc));
-    let txt=`Video prises pr time digitalisert opptak (${perTime} kr/time). For ${hrs.toFixed(1)} timer blir prisen ca ${nok(total)} kr.`;
-    if(disc>0) txt+=` (Inkluderer ${(disc*100).toFixed(0)}% rabatt.)`;
-    txt+=` USB/minnepenn kommer i tillegg (fra ${usbMin} kr).`;
+  let usbMin = toNum(prices.usb_min_price, 0);
+  if (!usbMin) usbMin = toInt(prices.usb_min_price, 0);
+  if (!usbMin) usbMin = toInt(prices.minnepenn, 295);
+  if (!usbMin) usbMin = 295;
+
+  if (minutter != null) {
+    const min = Math.max(0, toInt(minutter));
+    const hrs = min / 60;
+
+    // Rabatt: ≥10 t = 10%, ≥20 t = 20%
+    let disc = 0;
+    if (hrs >= 20) disc = 0.20;
+    else if (hrs >= 10) disc = 0.10;
+
+    const total = round5(hrs * perTime * (1 - disc));
+    let txt = `Video prises pr time digitalisert opptak (${perTime} kr/time). For ${hrs.toFixed(1)} timer blir prisen ca ${nok(total)} kr.`;
+    if (disc > 0) txt += ` (Inkluderer ${(disc * 100).toFixed(0)}% rabatt.)`;
+    txt += ` USB/minnepenn kommer i tillegg (fra ${usbMin} kr).`;
     return { answer: txt, source: "Pris" };
   }
 
-  if(kassetter != null){
-    const k=Math.max(1,toInt(kassetter));
-    const lowH=k*1.0, highH=k*2.0;
-    const lowDisc = lowH >=20?0.20 : (lowH >=10?0.10:0);
-    const higDisc = highH>=20?0.20 : (highH>=10?0.10:0);
-    const low=round5(lowH*perTime*(1-lowDisc));
-    const high=round5(highH*perTime*(1-higDisc));
-    const txt=[`Vi priser per time digitalisert video (${perTime} kr/time).`,
-               `${k} ${k===1?"kassett":"kassetter"} kan typisk være ${lowH.toFixed(1)}–${highH.toFixed(1)} timer`,
-               `⇒ ca ${nok(low)}–${nok(high)} kr (inkl. ev. volumrabatt).`,
-               `Oppgi gjerne total spilletid for et mer presist estimat. USB/minnepenn i tillegg (fra ${usbMin} kr).`].join(" ");
+  if (kassetter != null) {
+    const k = Math.max(1, toInt(kassetter));
+    // anslag 60–120 min pr kassett
+    const lowH  = k * 1.0;
+    const highH = k * 2.0;
+
+    const lowDisc  = lowH  >= 20 ? 0.20 : (lowH  >= 10 ? 0.10 : 0);
+    const highDisc = highH >= 20 ? 0.20 : (highH >= 10 ? 0.10 : 0);
+
+    const low  = round5(lowH  * perTime * (1 - lowDisc));
+    const high = round5(highH * perTime * (1 - highDisc));
+
+    const txt = [
+      `Vi priser per time digitalisert video (${perTime} kr/time).`,
+      `${k} ${k === 1 ? "kassett" : "kassetter"} kan typisk være ${lowH.toFixed(1)}–${highH.toFixed(1)} timer`,
+      `⇒ ca ${nok(low)}–${nok(high)} kr (inkl. ev. volumrabatt).`,
+      `Oppgi gjerne total spilletid for et mer presist estimat. USB/minnepenn i tillegg (fra ${usbMin} kr).`
+    ].join(" ");
     return { answer: txt, source: "Pris" };
   }
 
-  return { answer:`Video prises pr time (${perTime} kr/time). Oppgi gjerne total spilletid (timer/minutter), så regner jeg et konkret estimat. USB/minnepenn i tillegg (fra ${usbMin} kr).`, source:"Pris" };
+  return {
+    answer: `Video prises pr time (${perTime} kr/time). Oppgi gjerne total spilletid (timer/minutter), så regner jeg et konkret estimat. USB/minnepenn i tillegg (fra ${usbMin} kr).`,
+    source: "Pris"
+  };
 }
+
 
 /* ---------- Purchase intent ---------- */
 function handlePurchaseIntent(message,prices={}){
