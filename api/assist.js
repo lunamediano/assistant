@@ -126,12 +126,10 @@ function minutesFromUserHistory(history=[]){
 }
 
 /* ============== smalfilm kontekst ================== */
-// 🔧 inkluder S8/S-8 som Super 8, og dobbel-8-varianter
 function smalfilmInText(s=""){
   const m = (s || "").toLowerCase();
   return /(smalfilm|super\s*8|super8|s-?8|8\s*mm|8mm|dobbel[-\s]?8|double[-\s]?8|16\s*mm|16mm)/.test(m);
 }
-// 🔧 sjekk både bruker- og assistentmeldinger (siste 8) for smalfilm-kontekst
 function inSmalfilmContext(history=[]){
   if (!Array.isArray(history)) return false;
   const start = Math.max(0, history.length - 8);
@@ -403,6 +401,7 @@ function hasLengthWords(s=""){
   const m = (s || "").toLowerCase();
   return /(lengde|lang|min|minutt|minutter|time|timer|cm|meter|m|spol|spole|diameter)/.test(m);
 }
+
 const TABLE_MIN_PER_DIAM = {
   "7.5":  { "8mm": 4,  "super8": 4  },
   "12.7": { "8mm": 16, "super8": 12 },
@@ -410,6 +409,7 @@ const TABLE_MIN_PER_DIAM = {
   "17":   { "8mm": 32, "super8": 24 }
 };
 const MIN_PER_METER = { "8mm": 0.2667, "super8": 0.20 };
+
 function nearestKey(val, keys){
   let best = null, bestDiff = Infinity;
   for (const k of keys){
@@ -445,7 +445,21 @@ function estFromMeters(meters, format /* "8mm"|"super8"|null */){
   if (format === "super8")return { minutes: mS8, label: "Super 8" };
   return { rangeText: `ca ${m8} min (8 mm) / ca ${mS8} min (Super 8)` };
 }
-function handleSmalfilmLengthIntent(message, history){
+
+// Hent ALLE diametre i teksten: "12,7 cm, 17 cm", "12 cm og 18 cm", etc.
+function extractAllDiametersCM(text=""){
+  const m = (text || "").toLowerCase();
+  const out = [];
+  const re = /(\d{1,2}(?:[.,]\d)?)\s*cm\b/g;
+  let match;
+  while ((match = re.exec(m)) !== null){
+    const val = parseFloat(match[1].replace(",", "."));
+    if (Number.isFinite(val)) out.push(val);
+  }
+  return out;
+}
+
+function handleSmalfilmLengthIntent(message, history, prices){
   const m = (message || "").toLowerCase();
   const mentionsFilm   = smalfilmInText(m) || inSmalfilmContext(history);
   const mentionsLen    = hasLengthWords(m) || /(spol|diameter|cm|meter|m)\b/.test(m);
@@ -456,6 +470,39 @@ function handleSmalfilmLengthIntent(message, history){
   const is8  = /(8\s*mm|8mm)/.test(m) && !isS8;
   const format = isS8 ? "super8" : (is8 ? "8mm" : null);
 
+  // --- NYTT: flere diametre i samme setning
+  const allCM = extractAllDiametersCM(m);
+  if (allCM.length >= 1){
+    let perRoll = [];
+    let totalMin = 0;
+    for (const d of allCM){
+      const est = estFromDiameter(d, format);
+      if (!est) continue;
+      if (est.minutes){
+        perRoll.push(`${d} cm ≈ ${est.minutes} min${format ? (format==="super8"?" (Super 8)":" (8 mm)") : ""}`);
+        totalMin += est.minutes;
+      } else if (est.rangeText){
+        perRoll.push(`${d} cm → ${est.rangeText}`);
+      }
+    }
+
+    if (perRoll.length){
+      // Hvis vi har bestemt en total i minutter: gi også pris (antall ruller = antall diametre)
+      if (totalMin > 0){
+        const price = priceSmalfilm(totalMin, allCM.length, prices).answer;
+        return {
+          answer: `Per rull: ${perRoll.join("; ")}. ${price}`,
+          source: "Info"
+        };
+      }
+      return {
+        answer: `Per rull: ${perRoll.join("; ")}. Oppgi gjerne hvor mange slike spoler du har, så anslår jeg total spilletid og pris.`,
+        source: "Info"
+      };
+    }
+  }
+
+  // Én diameter eller meter i teksten?
   const cmMatch = m.match(/(\d{1,2}(?:[.,]\d)?)\s*cm/);
   const mMatch  = m.match(/(\d{1,3})\s*(?:m|meter)\b/);
 
@@ -464,16 +511,21 @@ function handleSmalfilmLengthIntent(message, history){
     if (cmMatch){
       const d = parseFloat(cmMatch[1].replace(",", "."));
       est = estFromDiameter(d, format);
+      if (est?.minutes){
+        const price = priceSmalfilm(est.minutes, 1, prices).answer;
+        return { answer: `${d} cm tilsvarer omtrent ${est.minutes} minutter${format? (format==="super8"?" (Super 8)":" (8 mm)"):""}. ${price}`, source:"Info" };
+      }
     } else {
       const meters = parseInt(mMatch[1],10);
       est = estFromMeters(meters, format);
+      if (est?.minutes){
+        const price = priceSmalfilm(est.minutes, 1, prices).answer;
+        return { answer: `${meters} meter tilsvarer omtrent ${est.minutes} minutter${format? (format==="super8"?" (Super 8)":" (8 mm)"):""}. ${price}`, source:"Info" };
+      }
     }
-    if (!est) return null;
-    const tail = "Oppgi gjerne hvor mange slike spoler du har, så anslår jeg total spilletid og pris.";
-    if (est.minutes) {
-      return { answer: `Det tilsvarer omtrent ${est.minutes} minutter${est.label?` ${est.label}`:""}. ${tail}`, source: "Info" };
+    if (est?.rangeText){
+      return { answer: `Det tilsvarer ${est.rangeText}. Oppgi gjerne hvor mange slike spoler du har, så anslår jeg total spilletid og pris.`, source:"Info" };
     }
-    return { answer: `Det tilsvarer ${est.rangeText}. ${tail}`, source: "Info" };
   }
 
   if (mentionsRuller){
@@ -529,8 +581,8 @@ export default async function handler(req, res){
     const salesHit = handlePurchaseIntent(message, prices);
     if (salesHit) return res.status(200).json(salesHit);
 
-    // 3) Smalfilm-lengde (diameter/meter)
-    const lenHit = handleSmalfilmLengthIntent(message, history);
+    // 3) Smalfilm-lengde (diameter/meter) – nå også SUM av flere diametre
+    const lenHit = handleSmalfilmLengthIntent(message, history, prices);
     if (lenHit) return res.status(200).json(lenHit);
 
     // 4) Pris-intents
