@@ -24,6 +24,22 @@ const toNum = (v, d=0) => Number.isFinite(Number(v)) ? Number(v) : d;
 const nok = (n) => toNum(n,0).toLocaleString("no-NO");
 const round5 = (n) => Math.round(n/5)*5;
 
+/* ---------- Purchase intent utils ---------- */
+const PURCHASE_WORDS = [
+  "kjøpe","kjøp","selger dere","selger du","kan jeg kjøpe","bestille","pris på usb","minnepenn pris",
+  "ramme","rammer","fotoutskrift","print","fine art","papir","tom kassett","tomme videokassetter",
+  "blank kassett","dvd-plater","cd-plater"
+];
+
+function looksLikePurchase(msg=""){
+  const m = msg.toLowerCase();
+  return PURCHASE_WORDS.some(w => m.includes(w));
+}
+function mentionsAny(msg="", words=[]){
+  const m = msg.toLowerCase();
+  return words.some(w => m.includes(w));
+}
+
 /* ---------- Booking utils ---------- */
 const BOOKING_KEYWORDS = [
   "filme", "filming", "videoopptak", "opptak",
@@ -344,6 +360,13 @@ export default async function handler(req, res){
       return res.status(200).json({ answer: kbHits[0].a, source: "FAQ" });
     }
 
+/* ---------- Purchase intent før pris-intents ---------- */
+const salesHit = handlePurchaseIntent(message, prices);
+if (salesHit) {
+  return res.status(200).json(salesHit);
+}
+
+
     // 2) Pris-intents
     // video først hvis melding nevner videoformater (inkl. hi8/video8/minidv)
     const vIntent = parseVideoIntent(message);
@@ -364,6 +387,56 @@ export default async function handler(req, res){
       const ruller   = smNow.ruller   ?? smHist.ruller   ?? null;
       return res.status(200).json( priceSmalfilm(minutter, ruller, prices) );
     }
+
+    /* ---------- Purchase intent handler ---------- */
+function handlePurchaseIntent(message, prices={}){
+  if (!looksLikePurchase(message)) return null;
+
+  const m = message.toLowerCase();
+  const usbMin = Number(prices?.usb_min_price ?? prices?.minnepenn ?? 295);
+
+  // 1) Tomme videokassetter / blank media
+  if (mentionsAny(m, ["tom kassett","tomme videokassetter","blank kassett","videokassetter","vhs-kassett"]) &&
+      !mentionsAny(m, ["minnepenn","usb"])) {
+    return {
+      answer:
+        "Vi selger ikke tomme video-/VHS-kassetter. Vi **digitaliserer** derimot eksisterende opptak. " +
+        `Til lagring selger vi **USB/minnepenner** i flere størrelser (fra ca. ${usbMin} kr), ` +
+        "og vi tilbyr også **fotoutskrifter i fine-art-kvalitet** og **rammer**. " +
+        "Si gjerne hva du ønsker å kjøpe, så hjelper jeg deg videre.",
+      source: "AI"
+    };
+  }
+
+  // 2) USB / minnepenn
+  if (mentionsAny(m, ["usb","minnepenn","minnepenner","memory stick"])) {
+    return {
+      answer:
+        `Ja, vi selger **USB/minnepenner** i ulike størrelser (god kvalitet, 10 års garanti). Pris fra ca. ${usbMin} kr. ` +
+        "Si gjerne hvor mye lagringsplass du trenger (f.eks. 32/64/128 GB), så foreslår jeg riktig størrelse.",
+      source: "AI"
+    };
+  }
+
+  // 3) Fotoutskrifter og rammer
+  if (mentionsAny(m, ["fotoutskrift","print","fine art","papir","ramme","rammer"])) {
+    return {
+      answer:
+        "Ja, vi tilbyr **fotoutskrifter i fine-art-kvalitet** og **rammer**. " +
+        "Oppgi gjerne ønsket størrelse og antall (f.eks. 30×40 cm, 5 stk), så gir vi pris og leveringstid.",
+      source: "AI"
+    };
+  }
+
+  // 4) Generelt kjøpsspørsmål
+  return {
+    answer:
+      "Vi har et begrenset utvalg produkter for salg: **USB/minnepenner**, **fotoutskrifter i fine-art-kvalitet** og **rammer**. " +
+      "Fortell meg hva du ønsker (type, størrelse/kapasitet og antall), så hjelper jeg deg med pris og levering.",
+    source: "AI"
+  };
+}
+
 
     /* ---------- 2.x Booking intent ---------- */
 function parseBookingIntent(message, history){
@@ -449,14 +522,20 @@ if (bookingHit) {
 
     // 3) LLM fallback
     const { tried, loaded } = { tried:[], loaded:[] };
-    const system = [
-      'Du er "Luna" – en vennlig og presis AI-assistent for Luna Media (Vestfold).',
-      "Svar kort på norsk. Bruk priseksempler og FAQ nedenfor når relevant.",
-      "Hvis noe er uklart eller pris mangler: si det, og foreslå tilbud via skjema/e-post.",
-      "",
-      "Priser (kan være tomt):",
-      JSON.stringify(prices, null, 2)
-    ].join("\n");
+const system = [
+  'Du er "Luna" – en vennlig og presis AI-assistent for Luna Media (Vestfold).',
+  "Svar kort på norsk. Bruk priseksempler og FAQ nedenfor når relevant.",
+  "Hvis noe er uklart eller pris mangler: si det, og foreslå tilbud via skjema/e-post.",
+  "Tilby menneskelig overtakelse ved spesielle behov.",
+  "VIKTIG: Hvis kunden spør om filming/booking (arrangement, bryllup, konfirmasjon, event):",
+  "- Tilby ALLTID menneskelig overtakelse i tillegg til svaret.",
+  "- Be konkret om: dato, sted, tidsrom, ønsket leveranse (klippet film/SoMe-klipp), og e-post.",
+  "- Eksempeltillegg: «Vi kan ta dette videre på e-post – kan du oppgi dato, sted, tidsrom og e-post?»",
+  "",
+  "Priser (kan være tomt):",
+  JSON.stringify(prices, null, 2)
+].join("\n");
+
 
     const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
     const model = process.env.LUNA_MODEL || "gpt-4o-mini";
