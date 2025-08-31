@@ -173,20 +173,53 @@ function looksLikeDelivery(msg = "") {
   ];
   return hasAnyWord(msg, keys);
 }
-function handleDeliveryIntent(message) {
-  if (!looksLikeDelivery(message)) return null;
-  const text = [
-    "Du kan sende pakken med Norgespakke med sporing til:",
-    "Luna Media, Pb. 60, 3107 Sem (bruk mottakers mobil 997 05 630).",
-    "",
-    "Du kan også levere direkte:",
-    "- Sem Senteret (2. etg.), Andebuveien 3, 3170 Sem",
-    "- Desk på Bislett i Oslo (Sofies gate 66A) – etter avtale",
-    "",
-    "Ring 33 74 02 80 eller skriv til kontakt@lunamedia.no for å avtale levering/henting."
-  ].join("\n");
-  return { answer: text, source: "Info" };
+function handlePurchaseIntent(message, prices={}) {
+  const m = (message||"").toLowerCase();
+  if (!hasAnyWord(m, PURCHASE_WORDS)) return null;
+
+  const usbMin = Number(prices?.usb_min_price ?? prices?.minnepenn ?? 295);
+
+  // Tomme videokassetter
+  if (hasAnyWord(m, ["tom kassett","tomme videokassetter","blank kassett","vhs-kassett"]) &&
+      !hasAnyWord(m, ["minnepenn","usb"])) {
+    return {
+      answer:
+        "Vi selger ikke tomme video-/VHS-kassetter. Vi digitaliserer derimot eksisterende opptak. " +
+        `Til lagring selger vi USB/minnepenner i flere størrelser (fra ca. ${usbMin} kr). ` +
+        "Vi tilbyr også fotoutskrifter i fine-art-kvalitet og rammer. Si gjerne hva du ønsker, så hjelper jeg deg videre.",
+      source: "Info"
+    };
+  }
+
+  // USB / minnepenn
+  if (hasAnyWord(m, ["usb","minnepenn","minnepenner","memory stick","memory-stick"])) {
+    return {
+      answer:
+        `Ja, vi selger USB/minnepenner i ulike størrelser. Pris fra ca. ${usbMin} kr. ` +
+        "Si gjerne hvor mye lagringsplass du trenger (for eksempel 32/64/128 GB), så foreslår jeg riktig størrelse.",
+      source: "Info"
+    };
+  }
+
+  // Fotoutskrifter og rammer
+  if (hasAnyWord(m, ["fotoutskrift","print","fine art","papir","ramme","rammer"])) {
+    return {
+      answer:
+        "Ja, vi tilbyr fotoutskrifter i fine-art-kvalitet og rammer. " +
+        "Oppgi ønsket størrelse og antall (for eksempel 30×40 cm, 5 stk), så gir vi pris og leveringstid.",
+      source: "Info"
+    };
+  }
+
+  // Generelt kjøpsspørsmål
+  return {
+    answer:
+      "Vi har et begrenset utvalg for salg: USB/minnepenner, fotoutskrifter i fine-art-kvalitet og rammer. " +
+      "Fortell hva du ønsker (type, størrelse/kapasitet og antall), så hjelper jeg deg med pris og levering.",
+    source: "Info"
+  };
 }
+
 
 /* Henting/pickup */
 function looksLikePickup(msg=""){
@@ -323,9 +356,9 @@ async function handleBookingIntent(message, history){
   ].join("\n");
 
   const sendRes = await sendBookingEmail({ to, from, subject, text });
-  const confirm =
-    `Takk! Jeg har notert *${slots.when}, ${slots.time}* på *${slots.place}*, ` +
-    `med leveranse *${slots.want}*. Jeg sender et uforpliktende tilbud til ${slots.email} svært snart.`;
+const confirm =
+  `Takk! Jeg har notert ${slots.when}, ${slots.time} på ${slots.place}, ` +
+  `med leveranse ${slots.want}. Jeg sender et uforpliktende tilbud til ${slots.email} svært snart.`;
 
   return {
     answer: confirm + (sendRes.ok ? "" : " (Varsling feilet, men vi følger opp manuelt.)"),
