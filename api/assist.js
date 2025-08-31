@@ -33,6 +33,33 @@ const PURCHASE_WORDS = [
 function looksLikePurchase(msg=""){ const m=msg.toLowerCase(); return PURCHASE_WORDS.some(w=>m.includes(w)); }
 function mentionsAny(msg="", words=[]){ const m=msg.toLowerCase(); return words.some(w=>m.includes(w)); }
 
+/* ---------- Delivery / innlevering intent ---------- */
+function looksLikeDelivery(msg = "") {
+  const m = (msg || "").toLowerCase();
+  return [
+    "levere", "innlevering", "innlevere", "levering",
+    "hvor kan jeg levere", "hvor leverer jeg", "adresse",
+    "sende", "post", "norgespakke", "returnere", "hente"
+  ].some(k => m.includes(k));
+}
+
+function handleDeliveryIntent(message) {
+  if (!looksLikeDelivery(message)) return null;
+
+  const text = [
+    "Du kan sende pakken med **Norgespakke med sporing** til:",
+    "Luna Media, **Pb. 60, 3107 Sem** (bruk mottakers mobil **997 05 630**).",
+    "",
+    "Du kan også levere direkte:",
+    "- **Sem Senteret (2. etg.)**, Andebuveien 3, 3170 Sem",
+    "- **Desk på Bislett** i Oslo (Sofies gate 66A) – **etter avtale**",
+    "",
+    "Ring **33 74 02 80** eller skriv til **kontakt@lunamedia.no** for å avtale levering/henting."
+  ].join("\n");
+
+  return { answer: text, source: "Info" };
+}
+
 /* ---------- Booking utils ---------- */
 const BOOKING_KEYWORDS = [
   "filme","filming","videoopptak","opptak","filmopptak",
