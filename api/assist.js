@@ -24,6 +24,72 @@ const toNum = (v, d=0) => Number.isFinite(Number(v)) ? Number(v) : d;
 const nok = (n) => toNum(n,0).toLocaleString("no-NO");
 const round5 = (n) => Math.round(n/5)*5;
 
+/* ---------- Booking utils ---------- */
+const BOOKING_KEYWORDS = [
+  "filme", "filming", "videoopptak", "opptak",
+  "arrangement", "konfirmasjon", "bryllup", "jubileum",
+  "event", "konsert", "seremoni", "presentasjon", "lansering"
+];
+
+function looksLikeBooking(msg) {
+  const m = (msg || "").toLowerCase();
+  // må inneholde en film/booking-term + en hendelse/setting
+  return BOOKING_KEYWORDS.some(k => m.includes(k));
+}
+
+// veldig enkle trekkere – vi henter detaljene stegvis fra melding + historikk
+function extractEmail(s=""){ const m=(s.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi)||[]); return m[0]||null; }
+function extractDate(s=""){
+  const m = (s||"").toLowerCase()
+    // dd.mm(.yyyy) | dd/mm | 1. sep | 1 september | 1 sept
+    .match(/\b(\d{1,2}[.\-/]\d{1,2}(?:[.\-/]\d{2,4})?|\d{1,2}\s*(?:jan|feb|mar|apr|mai|jun|jul|aug|sep|sept|okt|nov|des|januar|februar|mars|april|mai|juni|juli|august|september|oktober|november|desember))\b/);
+  return m ? m[1] : null;
+}
+function extractTimeRange(s=""){
+  const m = (s||"").toLowerCase()
+    // 10-14 | 10:00-13:30 | 10–14 | kl 10–14
+    .match(/\b(?:kl\.?\s*)?(\d{1,2}(?::\d{2})?)\s*[–-]\s*(\d{1,2}(?::\d{2})?)\b/);
+  return m ? `${m[1]}–${m[2]}` : null;
+}
+function extractPlace(s=""){
+  const m = (s||"").match(/\b(i|på)\s+([A-ZÆØÅ][\p{L}\- ]{1,40})\b/iu);
+  return m ? m[2].trim() : null;
+}
+function extractDeliverable(s=""){
+  const m = (s||"").toLowerCase();
+  if (/(klipp|redig|ferdig.*film|hovedfilm|sosiale medier|reels|tiktok|stories|som?e|teaser)/.test(m)) return "klippet film (ev. SoMe-klipp)";
+  if (/(råmateriale|råfiler)/.test(m)) return "råmateriale";
+  return null;
+}
+
+// hent siste forekomst av felt fra historikk
+function fromHistory(history, extractor){
+  if (!Array.isArray(history)) return null;
+  for (let i = history.length - 1; i >= 0; i--) {
+    const text = history[i]?.content || "";
+    const hit  = extractor(text);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+async function sendBookingEmail({to, from, subject, text}) {
+  const key = process.env.RESEND_API_KEY;
+  if (!key || !to || !from) return { ok:false, reason:"missing-config" };
+
+  const resp = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${key}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ to:[to], from, subject, text })
+  });
+  let data; try { data = await resp.json(); } catch { data = {}; }
+  return { ok: resp.ok, data };
+}
+
+
 /* --------------- load data --------------- */
 function loadData() {
   const faqCandidates = [
@@ -298,6 +364,88 @@ export default async function handler(req, res){
       const ruller   = smNow.ruller   ?? smHist.ruller   ?? null;
       return res.status(200).json( priceSmalfilm(minutter, ruller, prices) );
     }
+
+    /* ---------- 2.x Booking intent ---------- */
+function parseBookingIntent(message, history){
+  if (!looksLikeBooking(message)) return null;
+
+  // trekk ut fra melding
+  let when   = extractDate(message);
+  let time   = extractTimeRange(message);
+  let place  = extractPlace(message);
+  let want   = extractDeliverable(message);
+  let email  = extractEmail(message);
+
+  // fyll inn hull fra historikk (siste oppgitte vinner)
+  if (!when)  when  = fromHistory(history, extractDate);
+  if (!time)  time  = fromHistory(history, extractTimeRange);
+  if (!place) place = fromHistory(history, extractPlace);
+  if (!want)  want  = fromHistory(history, extractDeliverable);
+  if (!email) email = fromHistory(history, extractEmail);
+
+  return { when, time, place, want, email };
+}
+
+function missingBookingSlots(slots){
+  const need = [];
+  if (!slots.when)  need.push("dato");
+  if (!slots.time)  need.push("tidsrom");
+  if (!slots.place) need.push("sted");
+  if (!slots.want)  need.push("ønsket leveranse (f.eks. ferdig klippet film, SoMe-klipp)");
+  if (!slots.email) need.push("e-postadresse");
+  return need;
+}
+
+async function handleBookingIntent(message, history){
+  const slots = parseBookingIntent(message, history);
+  if (!slots) return null;
+
+  const need = missingBookingSlots(slots);
+  if (need.length){
+    // be om det som mangler – kort og vennlig
+    return {
+      answer: `Supert! For å gi et konkret tilbud trenger jeg ${need.join(", ")}. ` +
+              `Skriv f.eks.: “${slots.place||"Sted"} ${slots.when||"12.10"} ${slots.time||"12–15"}, ` +
+              `${slots.want||"klippet film"} – ${slots.email||"navn@epost.no"}”.`,
+      source: "AI"
+    };
+  }
+
+  // Vi har alt – send varsel til dere
+  const to   = process.env.LUNA_ALERT_TO   || "kontakt@lunamedia.no";
+  const from = process.env.LUNA_ALERT_FROM || "Luna Media <post@lunamedia.no>";
+
+  const subject = `Bookingforespørsel: ${slots.when} ${slots.time} – ${slots.place}`;
+  const text = [
+    "Ny forespørsel om filming:",
+    "",
+    `Dato: ${slots.when}`,
+    `Tidsrom: ${slots.time}`,
+    `Sted: ${slots.place}`,
+    `Ønsket leveranse: ${slots.want}`,
+    `Kontakt: ${slots.email}`,
+    "",
+    "Hele dialogen (siste meldinger først):",
+    ...(Array.isArray(history) ? history.slice(-10).reverse().map(h => `- ${h.role}: ${h.content}`) : [])
+  ].join("\n");
+
+  const sendRes = await sendBookingEmail({ to, from, subject, text });
+
+  const confirm =
+    `Takk! Jeg har notert *${slots.when}, ${slots.time}* på *${slots.place}*, ` +
+    `med leveranse *${slots.want}*. Jeg sender et uforpliktende tilbud til ${slots.email} veldig snart.`;
+
+  return {
+    answer: confirm + (sendRes.ok ? "" : " (Lite hint: e-postvarslet mitt feilet – men vi følger opp manuelt.)"),
+    source: "AI"
+  };
+}
+
+// --- Booking intent ---
+const bookingHit = await handleBookingIntent(message, history);
+if (bookingHit) {
+  return res.status(200).json(bookingHit);
+}
 
     // 3) LLM fallback
     const { tried, loaded } = { tried:[], loaded:[] };
