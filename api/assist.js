@@ -175,6 +175,79 @@ function minutesFromUserHistory(history = []) {
   return null;
 }
 
+/* =============== Spole/diameter -> minutter (anslag) =============== */
+// tabell i minutter (avrundet) for 8mm / Super8
+const SPOOL_TABLE = [
+  { d: 7.5,  m: 15, min8: 4,  minS8: 4  },
+  { d: 12.7, m: 60, min8: 16, minS8: 12 },
+  { d: 13.0, m: 60, min8: 16, minS8: 12 }, // toleranse-variant
+  { d: 14.5, m: 90, min8: 22, minS8: 18 },
+  { d: 15.0, m: 90, min8: 22, minS8: 18 }, // toleranse-variant
+  { d: 17.0, m:120, min8: 32, minS8: 24 },
+  { d: 18.0, m:120, min8: 32, minS8: 24 }
+];
+function estFromDiameter(diamCm, type = null) {
+  // finn nærmeste diameter i tabellen
+  let best = null, bestDiff = Infinity;
+  for (const row of SPOOL_TABLE) {
+    const diff = Math.abs((row.d || 0) - diamCm);
+    if (diff < bestDiff) { bestDiff = diff; best = row; }
+  }
+  if (!best) return null;
+  const min8  = best.min8;
+  const minS8 = best.minS8;
+  if (type === "8mm")   return { minutes: min8,  label: "8mm" };
+  if (type === "super8")return { minutes: minS8, label: "Super 8" };
+  // ukjent type → gi begge
+  return { rangeText: `ca. ${min8} min (8mm) eller ca. ${minS8} min (Super 8)` };
+}
+function estFromMeters(meters, type = null) {
+  // map 15/60/90/120 m (runde til nærmeste kjente)
+  const candidates = SPOOL_TABLE.map(x => x.m);
+  let best = null, bestDiff = Infinity, row = null;
+  for (const m of candidates) {
+    const diff = Math.abs(meters - m);
+    if (diff < bestDiff) { bestDiff = diff; best = m; }
+  }
+  row = SPOOL_TABLE.find(x => x.m === best);
+  if (!row) return null;
+  if (type === "8mm")   return { minutes: row.min8,  label: "8mm" };
+  if (type === "super8")return { minutes: row.minS8, label: "Super 8" };
+  return { rangeText: `ca. ${row.min8} min (8mm) eller ca. ${row.minS8} min (Super 8)` };
+}
+// Oppdag “spole”/“cm”/“meter” i tekst og svar med anslag
+function handleSmalfilmLengthIntent(message) {
+  const m = (message || "").toLowerCase();
+  if (!/(spol|diameter|cm|meter|m)\b/.test(m)) return null;
+  if (!/(smalfilm|super\s*8|super8|8\s*mm|8mm)/.test(m)) return null;
+
+  const cmMatch = m.match(/(\d{1,2}(?:[.,]\d)?)\s*cm/);
+  const mMatch  = m.match(/(\d{1,3})\s*(?:m|meter)\b/);
+  const isS8    = /(super\s*8|super8)/.test(m);
+  const is8     = /(8\s*mm|8mm)/.test(m) && !isS8;
+
+  let est = null;
+  if (cmMatch) {
+    const d = parseFloat(cmMatch[1].replace(",", "."));
+    est = estFromDiameter(d, isS8 ? "super8" : (is8 ? "8mm" : null));
+  } else if (mMatch) {
+    const meters = toInt(mMatch[1]);
+    est = estFromMeters(meters, isS8 ? "super8" : (is8 ? "8mm" : null));
+  }
+  if (!est) return null;
+
+  if (est.minutes) {
+    return {
+      answer: `Det tilsvarer omtrent ${est.minutes} minutter ${est.label}. Oppgi gjerne totalt antall spoler, så kan jeg anslå samlet spilletid eller pris.`,
+      source: "Info"
+    };
+  }
+  return {
+    answer: `Dette tilsvarer ${est.rangeText}. Hvis du vet om det er 8mm eller Super 8, kan jeg beregne mer presist – eller gi et prisestimat.`,
+    source: "Info"
+  };
+}
+
 /* =============== Prisregler =============== */
 // Smalfilm rabatt
 function smalfilmDiscount(totalMinutes) {
@@ -185,7 +258,7 @@ function smalfilmDiscount(totalMinutes) {
 // Smalfilm 8/16 basispriser + tillegg
 function priceSmalfilm(minutter, ruller, prices, type = "super8", lyd = "ingen") {
   // Super 8 / 8mm standard
-  let per20   = toNum(prices.s8_per_20min, 1500); // fallback – settes i priser.json om ønskelig
+  let per20   = toNum(prices.s8_per_20min, 1500); // fallbacks
   let perMin  = per20 / 20;
   let startGeb= toNum(prices.smalfilm_start_per_rull, 95);
   let usbMin  = toNum(prices.usb_min_price ?? prices.minnepenn, 295);
@@ -212,11 +285,17 @@ function priceSmalfilm(minutter, ruller, prices, type = "super8", lyd = "ingen")
     }
   }
 
+  const disclaimer =
+    "Det vil alltid være noen usikre variabler i utregning av lengde på smalfilm (dersom du ikke vet dette eksakt). " +
+    "Betrakt derfor svaret som et estimat, og kontakt oss gjerne på telefon eller e-post for et sikrere estimat og eventuelt pristilbud.";
+
   if (minutter == null) {
     const txt = [
       `Smalfilm prises med ca. ${Math.round(perMin)} kr per minutt + ${startGeb} kr i startgebyr per rull.`,
       `Vi gir 10% rabatt når samlet spilletid er over 3 timer, og 20% rabatt over 6 timer.`,
-      `Oppgi antall minutter og ruller for et konkret prisestimat. USB/minnepenn kommer i tillegg (fra ${usbMin} kr).`
+      `Oppgi antall minutter og ruller for et konkret prisestimat. USB/minnepenn kommer i tillegg (fra ${usbMin} kr).`,
+      "",
+      disclaimer
     ].join(" ");
     return { answer: txt, source: "Pris" };
   }
@@ -232,6 +311,7 @@ function priceSmalfilm(minutter, ruller, prices, type = "super8", lyd = "ingen")
   let out = `For ${mins} minutter smalfilm og ${rolls} ${rolls===1?"rull":"ruller"} er prisen ca ${nok(total)} kr.`;
   if (disc>0) out += ` (Rabatt er inkludert: ${(disc*100).toFixed(0)}% for ${(mins/60).toFixed(1)} timer totalt.)`;
   out += ` USB/minnepenn kommer i tillegg (fra ${usbMin} kr).`;
+  out += `\n\n${disclaimer}`;
 
   return { answer: out, source: "Pris" };
 }
@@ -256,7 +336,7 @@ function priceVideo({ minutter, kassetter }, prices) {
     const hrs = min / 60;
     let disc = 0;
     if (hrs >= 20) disc = 0.20;
-    else if (hrs >= 10) disc = 0.10; // 18 t -> 10% (riktig)
+    else if (hrs >= 10) disc = 0.10;
     const total = round5(hrs * perTime * (1 - disc));
     let txt = `Video prises pr time digitalisert opptak (${perTime} kr/time). For ${hrs.toFixed(1)} timer blir prisen ca ${nok(total)} kr.`;
     if (disc>0) txt += ` (Inkluderer ${(disc*100).toFixed(0)}% rabatt.)`;
@@ -514,7 +594,7 @@ export default async function handler(req, res) {
 
     const { faq, prices } = loadData();
 
-    // 1) FAQ først
+    // 1) FAQ
     const kbHits = simpleSearch(message, faq);
     if (kbHits?.[0]?.a) return res.status(200).json({ answer: kbHits[0].a, source: "FAQ" });
 
@@ -528,11 +608,15 @@ export default async function handler(req, res) {
     const delv = handleDeliveryIntent(message);
     if (delv) return res.status(200).json(delv);
 
-    // 4) Purchase intent
+    // 4) Spole/diameter → minutter (hjelpeanslag)
+    const spool = handleSmalfilmLengthIntent(message);
+    if (spool) return res.status(200).json(spool);
+
+    // 5) Purchase intent
     const salesHit = handlePurchaseIntent(message, prices);
     if (salesHit) return res.status(200).json(salesHit);
 
-    // 5) Pris-intents
+    // 6) Pris-intents
     const vIntent = parseVideoIntent(message);
     if (vIntent) {
       if (vIntent.minutter == null) vIntent.minutter = minutesFromUserHistory(history);
@@ -544,20 +628,17 @@ export default async function handler(req, res) {
     if (shouldSmalfilm) {
       const minutter = smNow.minutter ?? smHist.minutter ?? null;
       const ruller   = smNow.ruller   ?? smHist.ruller   ?? null;
-
-      // enkel autodeteksjon av type/lyd (kan utvides ved behov)
       const m = message.toLowerCase();
       const type = /16\s*mm|16mm/.test(m) ? "16mm" : "super8";
       const lyd  = /optisk/.test(m) ? "optisk" : (/lyd|magnet/i.test(m) ? "magnetisk" : "ingen");
-
       return res.status(200).json(priceSmalfilm(minutter, ruller, prices, type, lyd));
     }
 
-    // 6) Booking intent
+    // 7) Booking intent
     const bookingHit = await handleBookingIntent(message, history);
     if (bookingHit) return res.status(200).json(bookingHit);
 
-    // 7) LLM fallback
+    // 8) LLM fallback
     const system = [
       'Du er "Luna" – en vennlig og presis AI-assistent for Luna Media (Vestfold).',
       "Svar kort på norsk. Bruk priseksempler og FAQ nedenfor når relevant.",
