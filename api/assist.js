@@ -28,9 +28,8 @@ const round5 = (n) => Math.round(n/5)*5;
 const PURCHASE_WORDS = [
   "kjøpe","kjøp","selger dere","selger du","kan jeg kjøpe","bestille","pris på usb","minnepenn pris",
   "ramme","rammer","fotoutskrift","print","fine art","papir","tom kassett","tomme videokassetter",
-  "blank kassett","dvd-plater","cd-plater"
+  "blank kassett","dvd-plater","cd-plater","produkt","butikk","vare","sortiment"
 ];
-
 function looksLikePurchase(msg=""){
   const m = msg.toLowerCase();
   return PURCHASE_WORDS.some(w => m.includes(w));
@@ -42,28 +41,23 @@ function mentionsAny(msg="", words=[]){
 
 /* ---------- Booking utils ---------- */
 const BOOKING_KEYWORDS = [
-  "filme", "filming", "videoopptak", "opptak",
-  "arrangement", "konfirmasjon", "bryllup", "jubileum",
-  "event", "konsert", "seremoni", "presentasjon", "lansering"
+  "filme","filming","videoopptak","opptak","filmopptak",
+  "arrangement","konfirmasjon","bryllup","jubileum",
+  "event","konsert","seremoni","presentasjon","lansering","messe","konferanse"
 ];
-
 function looksLikeBooking(msg) {
   const m = (msg || "").toLowerCase();
-  // må inneholde en film/booking-term + en hendelse/setting
   return BOOKING_KEYWORDS.some(k => m.includes(k));
 }
-
-// veldig enkle trekkere – vi henter detaljene stegvis fra melding + historikk
+// trekkere – vi henter detaljene stegvis fra melding + historikk
 function extractEmail(s=""){ const m=(s.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi)||[]); return m[0]||null; }
 function extractDate(s=""){
   const m = (s||"").toLowerCase()
-    // dd.mm(.yyyy) | dd/mm | 1. sep | 1 september | 1 sept
     .match(/\b(\d{1,2}[.\-/]\d{1,2}(?:[.\-/]\d{2,4})?|\d{1,2}\s*(?:jan|feb|mar|apr|mai|jun|jul|aug|sep|sept|okt|nov|des|januar|februar|mars|april|mai|juni|juli|august|september|oktober|november|desember))\b/);
   return m ? m[1] : null;
 }
 function extractTimeRange(s=""){
   const m = (s||"").toLowerCase()
-    // 10-14 | 10:00-13:30 | 10–14 | kl 10–14
     .match(/\b(?:kl\.?\s*)?(\d{1,2}(?::\d{2})?)\s*[–-]\s*(\d{1,2}(?::\d{2})?)\b/);
   return m ? `${m[1]}–${m[2]}` : null;
 }
@@ -77,8 +71,6 @@ function extractDeliverable(s=""){
   if (/(råmateriale|råfiler)/.test(m)) return "råmateriale";
   return null;
 }
-
-// hent siste forekomst av felt fra historikk
 function fromHistory(history, extractor){
   if (!Array.isArray(history)) return null;
   for (let i = history.length - 1; i >= 0; i--) {
@@ -88,23 +80,17 @@ function fromHistory(history, extractor){
   }
   return null;
 }
-
 async function sendBookingEmail({to, from, subject, text}) {
   const key = process.env.RESEND_API_KEY;
   if (!key || !to || !from) return { ok:false, reason:"missing-config" };
-
   const resp = await fetch("https://api.resend.com/emails", {
     method: "POST",
-    headers: {
-      "Authorization": `Bearer ${key}`,
-      "Content-Type": "application/json"
-    },
+    headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({ to:[to], from, subject, text })
   });
   let data; try { data = await resp.json(); } catch { data = {}; }
   return { ok: resp.ok, data };
 }
-
 
 /* --------------- load data --------------- */
 function loadData() {
@@ -123,7 +109,6 @@ function loadData() {
     if (!exists) continue;
     const parsed = safeRead(p, "yaml"); if (!parsed) continue;
     loaded.push({ path:p, size: fs.statSync(p).size });
-
     if (isLuna) {
       const fromLunaFaq =
         Array.isArray(parsed?.faq) ? parsed.faq :
@@ -182,7 +167,7 @@ const NO_WORDNUM = {
 };
 function wordToNum(w){
   const k = (w||"").toLowerCase().normalize("NFKD").replace(/[^a-zæøå]/g,"");
-  return NO_WORDNUM.hasOwnProperty(k) ? NO_WORDNUM[k] : null;
+  return Object.prototype.hasOwnProperty.call(NO_WORDNUM, k) ? NO_WORDNUM[k] : null;
 }
 
 /* --------------- extract helpers --------------- */
@@ -213,12 +198,11 @@ function extractRuller(text=""){
 function parseSmalfilmLoose(text=""){
   const m = text.toLowerCase();
   const hasFilm = /(smalfilm|super\s*8|super8|8\s*mm|8mm|16\s*mm|16mm)/.test(m);
-  const mentionsRullOnly = /(rull|ruller)/.test(m);
+  const mentionsRullOnly = /(rull|ruller)\b/.test(m);
   const minutter = extractMinutes(m);
   const ruller   = extractRuller(m);
   return { hasFilm, mentionsRullOnly, minutter, ruller };
 }
-// only USER messages when mining context
 function historySmalfilm(history=[]){
   let ctx = { hasFilm:false, minutter:null, ruller:null };
   for (let i=history.length-1; i>=0; i--){
@@ -329,6 +313,128 @@ function priceVideo({minutter, kassetter}, prices){
   };
 }
 
+/* ---------- Purchase intent handler (utenfor handler for klarhet) ---------- */
+function handlePurchaseIntent(message, prices={}){
+  if (!looksLikePurchase(message)) return null;
+
+  const m = message.toLowerCase();
+  const usbMin = Number(prices?.usb_min_price ?? prices?.minnepenn ?? 295);
+
+  // 1) Tomme videokassetter / blank media
+  if (mentionsAny(m, ["tom kassett","tomme videokassetter","blank kassett","videokassetter","vhs-kassett"]) &&
+      !mentionsAny(m, ["minnepenn","usb"])) {
+    return {
+      answer:
+        "Vi selger ikke tomme video-/VHS-kassetter. Vi digitaliserer derimot eksisterende opptak. " +
+        `Til lagring selger vi USB/minnepenner i flere størrelser (fra ca. ${usbMin} kr), ` +
+        "og vi tilbyr også fotoutskrifter i fine-art-kvalitet og rammer. " +
+        "Si gjerne hva du ønsker å kjøpe, så hjelper jeg deg videre.",
+      source: "AI"
+    };
+  }
+
+  // 2) USB / minnepenn
+  if (mentionsAny(m, ["usb","minnepenn","minnepenner","memory stick"])) {
+    return {
+      answer:
+        `Ja, vi selger USB/minnepenner i ulike størrelser (god kvalitet, 10 års garanti). Pris fra ca. ${usbMin} kr. ` +
+        "Si gjerne hvor mye lagringsplass du trenger (f.eks. 32/64/128 GB), så foreslår jeg riktig størrelse.",
+      source: "AI"
+    };
+  }
+
+  // 3) Fotoutskrifter og rammer
+  if (mentionsAny(m, ["fotoutskrift","print","fine art","papir","ramme","rammer"])) {
+    return {
+      answer:
+        "Ja, vi tilbyr fotoutskrifter i fine-art-kvalitet og rammer. " +
+        "Oppgi gjerne ønsket størrelse og antall (f.eks. 30×40 cm, 5 stk), så gir vi pris og leveringstid.",
+      source: "AI"
+    };
+  }
+
+  // 4) Generelt kjøpsspørsmål
+  return {
+    answer:
+      "Vi har et begrenset utvalg produkter for salg: USB/minnepenner, fotoutskrifter i fine-art-kvalitet og rammer. " +
+      "Fortell meg hva du ønsker (type, størrelse/kapasitet og antall), så hjelper jeg deg med pris og levering.",
+    source: "AI"
+  };
+}
+
+/* ---------- Booking intent (utenfor handler) ---------- */
+function parseBookingIntent(message, history){
+  if (!looksLikeBooking(message)) return null;
+
+  // trekk ut fra melding
+  let when   = extractDate(message);
+  let time   = extractTimeRange(message);
+  let place  = extractPlace(message);
+  let want   = extractDeliverable(message);
+  let email  = extractEmail(message);
+
+  // fyll inn hull fra historikk (siste oppgitte vinner)
+  if (!when)  when  = fromHistory(history, extractDate);
+  if (!time)  time  = fromHistory(history, extractTimeRange);
+  if (!place) place = fromHistory(history, extractPlace);
+  if (!want)  want  = fromHistory(history, extractDeliverable);
+  if (!email) email = fromHistory(history, extractEmail);
+
+  return { when, time, place, want, email };
+}
+function missingBookingSlots(slots){
+  const need = [];
+  if (!slots.when)  need.push("dato");
+  if (!slots.time)  need.push("tidsrom");
+  if (!slots.place) need.push("sted");
+  if (!slots.want)  need.push("ønsket leveranse (f.eks. klippet film/SoMe-klipp)");
+  if (!slots.email) need.push("e-postadresse");
+  return need;
+}
+async function handleBookingIntent(message, history){
+  const slots = parseBookingIntent(message, history);
+  if (!slots) return null;
+
+  const need = missingBookingSlots(slots);
+  if (need.length){
+    return {
+      answer: `Supert! For å gi et konkret tilbud trenger jeg ${need.join(", ")}. ` +
+              `Skriv f.eks.: “${slots.place||"Sted"} ${slots.when||"12.10"} ${slots.time||"12–15"}, ` +
+              `${slots.want||"klippet film"} – ${slots.email||"navn@epost.no"}”.`,
+      source: "AI"
+    };
+  }
+
+  // Vi har alt – send varsel til dere
+  const to   = process.env.LUNA_ALERT_TO   || "kontakt@lunamedia.no";
+  const from = process.env.LUNA_ALERT_FROM || "Luna Media <post@lunamedia.no>";
+
+  const subject = `Bookingforespørsel: ${slots.when} ${slots.time} – ${slots.place}`;
+  const text = [
+    "Ny forespørsel om filming:",
+    "",
+    `Dato: ${slots.when}`,
+    `Tidsrom: ${slots.time}`,
+    `Sted: ${slots.place}`,
+    `Ønsket leveranse: ${slots.want}`,
+    `Kontakt: ${slots.email}`,
+    "",
+    "Hele dialogen (siste meldinger først):",
+    ...(Array.isArray(history) ? history.slice(-10).reverse().map(h => `- ${h.role}: ${h.content}`) : [])
+  ].join("\n");
+
+  const sendRes = await sendBookingEmail({ to, from, subject, text });
+
+  const confirm =
+    `Takk! Jeg har notert ${slots.when}, ${slots.time} på ${slots.place}, ` +
+    `med leveranse “${slots.want}”. Jeg sender et uforpliktende tilbud til ${slots.email} veldig snart.`;
+
+  return {
+    answer: confirm + (sendRes.ok ? "" : " (Lite hint: e-postvarslet mitt feilet – men vi følger opp manuelt.)"),
+    source: "AI"
+  };
+}
+
 /* --------------- handler --------------- */
 export default async function handler(req, res){
   const allowed = (process.env.LUNA_ALLOWED_ORIGINS || "*").split(",").map(s=>s.trim());
@@ -360,189 +466,53 @@ export default async function handler(req, res){
       return res.status(200).json({ answer: kbHits[0].a, source: "FAQ" });
     }
 
-/* ---------- Purchase intent før pris-intents ---------- */
-const salesHit = handlePurchaseIntent(message, prices);
-if (salesHit) {
-  return res.status(200).json(salesHit);
-}
+    // 2) Purchase intent (KJØP) – før pris-intenter
+    const salesHit = handlePurchaseIntent(message, prices);
+    if (salesHit) return res.status(200).json(salesHit);
 
-
-    // 2) Pris-intents
-    // video først hvis melding nevner videoformater (inkl. hi8/video8/minidv)
+    // 3) Pris-intents – video først
     const vIntent = parseVideoIntent(message);
     if (vIntent){
       if (vIntent.minutter == null) vIntent.minutter = minutesFromUserHistory(history);
       return res.status(200).json( priceVideo(vIntent, prices) );
     }
 
-    // smalfilm med kontekst
+    // Smalfilm m/kontekst
     const smNow  = parseSmalfilmLoose(message);
     const smHist = historySmalfilm(history);
     const shouldSmalfilm =
       smNow.hasFilm ||
       (smNow.mentionsRullOnly && (smHist.hasFilm || smHist.minutter!=null));
-
     if (shouldSmalfilm){
       const minutter = smNow.minutter ?? smHist.minutter ?? null;
       const ruller   = smNow.ruller   ?? smHist.ruller   ?? null;
       return res.status(200).json( priceSmalfilm(minutter, ruller, prices) );
     }
 
-    /* ---------- Purchase intent handler ---------- */
-function handlePurchaseIntent(message, prices={}){
-  if (!looksLikePurchase(message)) return null;
+    // 4) Booking intent
+    const bookingHit = await handleBookingIntent(message, history);
+    if (bookingHit) return res.status(200).json(bookingHit);
 
-  const m = message.toLowerCase();
-  const usbMin = Number(prices?.usb_min_price ?? prices?.minnepenn ?? 295);
-
-  // 1) Tomme videokassetter / blank media
-  if (mentionsAny(m, ["tom kassett","tomme videokassetter","blank kassett","videokassetter","vhs-kassett"]) &&
-      !mentionsAny(m, ["minnepenn","usb"])) {
-    return {
-      answer:
-        "Vi selger ikke tomme video-/VHS-kassetter. Vi **digitaliserer** derimot eksisterende opptak. " +
-        `Til lagring selger vi **USB/minnepenner** i flere størrelser (fra ca. ${usbMin} kr), ` +
-        "og vi tilbyr også **fotoutskrifter i fine-art-kvalitet** og **rammer**. " +
-        "Si gjerne hva du ønsker å kjøpe, så hjelper jeg deg videre.",
-      source: "AI"
-    };
-  }
-
-  // 2) USB / minnepenn
-  if (mentionsAny(m, ["usb","minnepenn","minnepenner","memory stick"])) {
-    return {
-      answer:
-        `Ja, vi selger **USB/minnepenner** i ulike størrelser (god kvalitet, 10 års garanti). Pris fra ca. ${usbMin} kr. ` +
-        "Si gjerne hvor mye lagringsplass du trenger (f.eks. 32/64/128 GB), så foreslår jeg riktig størrelse.",
-      source: "AI"
-    };
-  }
-
-  // 3) Fotoutskrifter og rammer
-  if (mentionsAny(m, ["fotoutskrift","print","fine art","papir","ramme","rammer"])) {
-    return {
-      answer:
-        "Ja, vi tilbyr **fotoutskrifter i fine-art-kvalitet** og **rammer**. " +
-        "Oppgi gjerne ønsket størrelse og antall (f.eks. 30×40 cm, 5 stk), så gir vi pris og leveringstid.",
-      source: "AI"
-    };
-  }
-
-  // 4) Generelt kjøpsspørsmål
-  return {
-    answer:
-      "Vi har et begrenset utvalg produkter for salg: **USB/minnepenner**, **fotoutskrifter i fine-art-kvalitet** og **rammer**. " +
-      "Fortell meg hva du ønsker (type, størrelse/kapasitet og antall), så hjelper jeg deg med pris og levering.",
-    source: "AI"
-  };
-}
-
-
-    /* ---------- 2.x Booking intent ---------- */
-function parseBookingIntent(message, history){
-  if (!looksLikeBooking(message)) return null;
-
-  // trekk ut fra melding
-  let when   = extractDate(message);
-  let time   = extractTimeRange(message);
-  let place  = extractPlace(message);
-  let want   = extractDeliverable(message);
-  let email  = extractEmail(message);
-
-  // fyll inn hull fra historikk (siste oppgitte vinner)
-  if (!when)  when  = fromHistory(history, extractDate);
-  if (!time)  time  = fromHistory(history, extractTimeRange);
-  if (!place) place = fromHistory(history, extractPlace);
-  if (!want)  want  = fromHistory(history, extractDeliverable);
-  if (!email) email = fromHistory(history, extractEmail);
-
-  return { when, time, place, want, email };
-}
-
-function missingBookingSlots(slots){
-  const need = [];
-  if (!slots.when)  need.push("dato");
-  if (!slots.time)  need.push("tidsrom");
-  if (!slots.place) need.push("sted");
-  if (!slots.want)  need.push("ønsket leveranse (f.eks. ferdig klippet film, SoMe-klipp)");
-  if (!slots.email) need.push("e-postadresse");
-  return need;
-}
-
-async function handleBookingIntent(message, history){
-  const slots = parseBookingIntent(message, history);
-  if (!slots) return null;
-
-  const need = missingBookingSlots(slots);
-  if (need.length){
-    // be om det som mangler – kort og vennlig
-    return {
-      answer: `Supert! For å gi et konkret tilbud trenger jeg ${need.join(", ")}. ` +
-              `Skriv f.eks.: “${slots.place||"Sted"} ${slots.when||"12.10"} ${slots.time||"12–15"}, ` +
-              `${slots.want||"klippet film"} – ${slots.email||"navn@epost.no"}”.`,
-      source: "AI"
-    };
-  }
-
-  // Vi har alt – send varsel til dere
-  const to   = process.env.LUNA_ALERT_TO   || "kontakt@lunamedia.no";
-  const from = process.env.LUNA_ALERT_FROM || "Luna Media <post@lunamedia.no>";
-
-  const subject = `Bookingforespørsel: ${slots.when} ${slots.time} – ${slots.place}`;
-  const text = [
-    "Ny forespørsel om filming:",
-    "",
-    `Dato: ${slots.when}`,
-    `Tidsrom: ${slots.time}`,
-    `Sted: ${slots.place}`,
-    `Ønsket leveranse: ${slots.want}`,
-    `Kontakt: ${slots.email}`,
-    "",
-    "Hele dialogen (siste meldinger først):",
-    ...(Array.isArray(history) ? history.slice(-10).reverse().map(h => `- ${h.role}: ${h.content}`) : [])
-  ].join("\n");
-
-  const sendRes = await sendBookingEmail({ to, from, subject, text });
-
-  const confirm =
-    `Takk! Jeg har notert *${slots.when}, ${slots.time}* på *${slots.place}*, ` +
-    `med leveranse *${slots.want}*. Jeg sender et uforpliktende tilbud til ${slots.email} veldig snart.`;
-
-  return {
-    answer: confirm + (sendRes.ok ? "" : " (Lite hint: e-postvarslet mitt feilet – men vi følger opp manuelt.)"),
-    source: "AI"
-  };
-}
-
-// --- Booking intent ---
-const bookingHit = await handleBookingIntent(message, history);
-if (bookingHit) {
-  return res.status(200).json(bookingHit);
-}
-
-    // 3) LLM fallback
-    const { tried, loaded } = { tried:[], loaded:[] };
-const system = [
-  'Du er "Luna" – en vennlig og presis AI-assistent for Luna Media (Vestfold).',
-  "Svar kort på norsk. Bruk priseksempler og FAQ nedenfor når relevant.",
-  "Hvis noe er uklart eller pris mangler: si det, og foreslå tilbud via skjema/e-post.",
-  "Tilby menneskelig overtakelse ved spesielle behov.",
-  "VIKTIG: Hvis kunden spør om filming/booking (arrangement, bryllup, konfirmasjon, event):",
-  "- Tilby ALLTID menneskelig overtakelse i tillegg til svaret.",
-  "- Be konkret om: dato, sted, tidsrom, ønsket leveranse (klippet film/SoMe-klipp), og e-post.",
-  "- Eksempeltillegg: «Vi kan ta dette videre på e-post – kan du oppgi dato, sted, tidsrom og e-post?»",
-  "",
-  "Priser (kan være tomt):",
-  JSON.stringify(prices, null, 2)
-].join("\n");
-
+    // 5) LLM fallback (med filming-guard i prompten)
+    const system = [
+      'Du er "Luna" – en vennlig og presis AI-assistent for Luna Media (Vestfold).',
+      "Svar kort på norsk. Bruk priseksempler og FAQ nedenfor når relevant.",
+      "Hvis noe er uklart eller pris mangler: si det, og foreslå tilbud via skjema/e-post.",
+      "Tilby menneskelig overtakelse ved spesielle behov.",
+      "VIKTIG: Hvis kunden spør om filming/booking (arrangement, bryllup, konfirmasjon, event):",
+      "- Tilby ALLTID menneskelig overtakelse i tillegg til svaret.",
+      "- Be konkret om: dato, sted, tidsrom, ønsket leveranse (klippet film/SoMe-klipp), og e-post.",
+      "- Eksempeltillegg: «Vi kan ta dette videre på e-post – kan du oppgi dato, sted, tidsrom og e-post?»",
+      "",
+      "Priser (kan være tomt):",
+      JSON.stringify(prices, null, 2)
+    ].join("\n");
 
     const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
     const model = process.env.LUNA_MODEL || "gpt-4o-mini";
     const user = `Kunde spør: ${message}\nSvar på norsk, maks 2–3 setninger.`;
 
     let answer = "Beklager, jeg har ikke et godt svar på dette akkurat nå. Send oss gjerne e-post på kontakt@lunamedia.no eller ring 33 74 02 80.";
-
     if (!OPENAI_API_KEY){
       return res.status(200).json({ answer, source:"fallback_no_key" });
     }
