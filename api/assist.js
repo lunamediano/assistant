@@ -1,8 +1,7 @@
-// /api/assist.js
-// Miljøvariabler som må settes i drift/dev:
-// - RESEND_API_KEY=... (fra Resend → API Keys)
-// - LUNA_FROM_EMAIL=kontakt@lunamedia.no
-// - LUNA_FROM_NAME=Luna Media
+// /api/assist.js (MERGED)
+// Luna Media – AI-assistent for nettside
+// Denne versjonen er sammenslått med dialogen for smalfilm (format+lyd → priser → estimat)
+// Beholder eksisterende funksjoner, og legger til en liten tilstandsløs dialog basert på historikk.
 
 import yaml from "js-yaml";
 import fs from "fs";
@@ -55,7 +54,7 @@ async function sendViaResend({ to, subject, text, html }) {
       to,
       subject,
       text,
-      html, // kan utelates; Resend støtter text-only
+      html,
       reply_to: fromEmail,
     }),
   });
@@ -65,7 +64,7 @@ async function sendViaResend({ to, subject, text, html }) {
     const msg = data?.message || data?.error || JSON.stringify(data);
     throw new Error(`Resend-feil: ${msg}`);
   }
-  return data; // { id, ... }
+  return data;
 }
 
 /* ========== data loader ========== */
@@ -221,7 +220,6 @@ function extractRuller(text = "") {
   return extractCount(text, "(rull|ruller)\\b");
 }
 function extractDiameters(text = "") {
-  // Finn flere cm-verdier i en setning: "12 cm, 14 cm og 17 cm"
   const arr = [];
   const re = /(\d{1,2}(?:[.,]\d)?)\s*cm\b/gi;
   let m;
@@ -276,7 +274,6 @@ function deliveryIntent(msg = "") {
   if (!/(levere|levering|hente|henting|post|adresse|send(e)?|innlevering)/.test(m))
     return null;
 
-  // «hente i drammen» / «kan dere hente»
   if (/(kan.*hente|hente.*hos|hente.*drammen|hjemmehenting)/.test(m)) {
     return {
       answer:
@@ -365,7 +362,6 @@ function minutesFromDiameter(cm, isSuper8 = true) {
       return isSuper8 ? row.s8Min : row.d8Min;
     }
   }
-  // fallback grove anslag
   if (cm >= 11 && cm < 14) return isSuper8 ? 12 : 16;
   if (cm >= 14 && cm < 16) return isSuper8 ? 18 : 22;
   if (cm >= 16 && cm < 18.5) return isSuper8 ? 24 : 32;
@@ -374,8 +370,8 @@ function minutesFromDiameter(cm, isSuper8 = true) {
 
 /* ========== smalfilm pris/intent (8mm/S8 generisk) ========== */
 function smalfilmDiscount(totalMinutes) {
-  if (totalMinutes >= 360) return 0.2; // ≥ 6 t
-  if (totalMinutes > 180) return 0.1; // > 3 t
+  if (totalMinutes >= 360) return 0.2;
+  if (totalMinutes > 180) return 0.1;
   return 0;
 }
 function priceSmalfilm(minutter, ruller, prices, addUncertaintyLine = true) {
@@ -421,9 +417,7 @@ function priceSmalfilm(minutter, ruller, prices, addUncertaintyLine = true) {
 
 /* ========== 16 mm pris (20-min blokker + lydtillegg) ========== */
 function price16mm({ minutter, lyd }, prices) {
-  // Grunnpris pr 20 min 16mm (uten lyd)
-  const basePer20 = toNum(prices?.film16_base_20min ?? 1795); // inkl mva
-  // Lyd-tillegg pr 20 min
+  const basePer20 = toNum(prices?.film16_base_20min ?? 1795);
   const magAddPer20 = toNum(prices?.film16_magnet_20min ?? 200);
   const optAddPer20 = toNum(prices?.film16_optisk_20min ?? 2990);
 
@@ -488,7 +482,7 @@ function priceVideo({ minutter }, prices) {
   return { answer: txt, source: "Pris" };
 }
 
-/* ========== parsere for intensjoner ========== */
+/* ========== Intent-parsere ========== */
 function parseVideoIntent(text = "") {
   const m = text.toLowerCase();
   if (!/(vhs|videokassett|videobånd|hi8|video8|minidv|vhsc)/.test(m)) return null;
@@ -505,26 +499,19 @@ function parseS8Intent(text = "", history = []) {
   const diameters = extractDiameters(text);
   let ruller = extractRuller(text);
 
-  // Dersom bruker bare sier "2 ruller S8" uten minutter/diameter: husk antall
   if (ruller == null) {
-    // prøv fra tidligere
     for (let i = history.length - 1; i >= 0; i--) {
       const d = extractRuller(history[i]?.content || "");
-      if (d != null) {
-        ruller = d;
-        break;
-      }
+      if (d != null) { ruller = d; break; }
     }
   }
 
-  // Estimer minutter fra oppgitte diametre
   let minutter = null;
   if (diameters.length) {
     minutter = diameters
       .map((cm) => minutesFromDiameter(cm, isSuper8))
       .reduce((a, b) => a + b, 0);
   } else {
-    // eksplisitt «4 timer» i tekst?
     minutter = extractMinutes(m);
   }
 
@@ -543,25 +530,70 @@ function parse16mmIntent(text = "", history = []) {
 
 /* ========== SEND E-POST intent-parser ========== */
 function parseSendEmailIntent(text = "") {
-  // Eksempel: Send en e-post til ola@nordmann.no med emne "Hei" og innhold "Tekst ..."
   const m = text.trim();
-
-  // finn e-post etter "til"
   const toMatch = m.match(/til\s+([^\s"<>]+@[^\s"<>]+)\b/i);
   if (!toMatch) return null;
   let to = toMatch[1];
-  // fjern ev. omsluttende tegn som []()<>,.;:
-  to = to.replace(/^[<\[\(]+|[>\]\),.;:]+$/g, "");
-
-  // emne og innhold i sitattegn (rette eller “smarte”)
+  to = to.replace(/^[<\[\(]+|[>\],.;:)+$/g, "");
   const subjMatch = m.match(/emne\s*[:=]?\s*["'“”]([^"'“”]+)["'“”]/i);
   const bodyMatch = m.match(/innhold\s*[:=]?\s*["'“”]([^"'“”]+)["'“”]/i);
   if (!subjMatch || !bodyMatch) return null;
-
   const subject = subjMatch[1].trim();
   const body = bodyMatch[1].trim();
-
   return { to, subject, body };
+}
+
+/* ========== Smalfilm dialog (ny) ========== */
+const SMALFILM_ASK = "Hva slags type film ønsker du å få digitalisert? Super 8, normal 8 mm eller 16 mm? Og er det med eller uten lyd?";
+function isGenericSmalfilmQuestion(msg = "") {
+  const m = msg.toLowerCase();
+  return /smalfilm|super\s*8|\b8\s*mm\b|16\s*mm/.test(m);
+}
+function lastAssistantAskedFormat(history = []) {
+  if (!Array.isArray(history) || !history.length) return false;
+  for (let i = history.length - 1; i >= 0; i--) {
+    const h = history[i];
+    if (h.role !== "assistant") continue;
+    return (h.content || "").includes(SMALFILM_ASK) || /med eller uten lyd\?$/i.test(h.content || "");
+  }
+  return false;
+}
+function detectFormats(text = "") {
+  const t = text.toLowerCase();
+  const set = new Set();
+  if (/(super\s*8|\bs8\b)/.test(t)) set.add("super8");
+  if (/\b8\s*mm\b/.test(t) && !/(super\s*8|\bs8\b)/.test(t)) set.add("normal8");
+  if (/16\s*mm/.test(t)) set.add("16mm");
+  return [...set];
+}
+function detectAudio(text = "") {
+  const t = text.toLowerCase();
+  if (/uten\s*lyd|ikke\s*lyd|no\s*audio/.test(t)) return "uten";
+  if (/med\s*lyd|optisk\s*lyd|magnetisk\s*lyd/.test(t)) return "med";
+  return null;
+}
+function pricesForFormats(formats = [], audio, prices) {
+  const lines = [];
+  const s8Line = () => `Super 8 / 8 mm: fra ${toNum(prices.smalfilm_min_rate ?? prices.smalfilm_per_minutt ?? 75)} kr per minutt + ${toNum(prices.smalfilm_start_per_rull ?? 95)} kr per rull.`;
+  const p16 = price16mm({ minutter: null }, prices).answer;
+  if (formats.includes("super8") || formats.includes("normal8")) lines.push(s8Line());
+  if (formats.includes("16mm")) lines.push(p16.replace(/\*\*/g, ""));
+  if (!lines.length) lines.push(s8Line());
+  const lydTxt = audio ? ` (registrert: ${audio} lyd)` : "";
+  lines.push("Vil du at jeg lager et uforpliktende prisestimat? Oppgi antall ruller og ca. minutter pr. rull – eller totalt antall minutter." + lydTxt);
+  return lines.join("\n");
+}
+function handleSmalfilmDialog(message, history, prices) {
+  const askedBefore = lastAssistantAskedFormat(history);
+  if (!askedBefore) {
+    return { answer: SMALFILM_ASK, source: "AI" };
+  }
+  const fmts = detectFormats(message);
+  const aud = detectAudio(message);
+  if (!fmts.length && !aud) {
+    return { answer: "For å hjelpe deg riktig: er det Super 8, normal 8 mm eller 16 mm – og med eller uten lyd?", source: "AI" };
+  }
+  return { answer: pricesForFormats(fmts, aud, prices), source: "AI" };
 }
 
 /* ========== handler ========== */
@@ -586,17 +618,13 @@ export default async function handler(req, res) {
   try {
     let body = req.body || {};
     if (typeof body === "string") {
-      try {
-        body = JSON.parse(body);
-      } catch {
-        body = {};
-      }
+      try { body = JSON.parse(body); } catch { body = {}; }
     }
     const message = (body.message || "").trim();
     const history = Array.isArray(body.history) ? body.history : [];
     if (!message) return res.status(400).json({ error: "Missing message" });
 
-    // (0a) SEND E-POST – håndter tidlig så ikke andre intents overstyrer
+    // (0a) SEND E-POST
     const sendIntent = parseSendEmailIntent(message);
     if (sendIntent) {
       try {
@@ -640,7 +668,7 @@ export default async function handler(req, res) {
 
     const { faq, prices } = loadData();
 
-    /* 0) Fast intents som ikke skal drukne i pris */
+    /* 0) Fixed intents */
     const repair = cassetteRepairIntent(message);
     if (repair) return res.status(200).json(repair);
 
@@ -650,48 +678,49 @@ export default async function handler(req, res) {
     const sales = purchaseIntent(message, prices);
     if (sales) return res.status(200).json(sales);
 
-    // Ber om én kategori om gangen hvis flere nevnes
+    // Flere kategorier → be om én om gangen
     const cats = detectMediaCategories(message);
     if (cats.length >= 2) {
       return res.status(200).json(multiCategoryResponse(cats));
     }
 
-    /* 1) FAQ */
+    /* 1) SMALFILM DIALOG INTERCEPT (før FAQ)
+       Hvis brukeren spør generelt om smalfilm, still kontrollspørsmål om format + lyd,
+       og deretter vis priser for de formatene de nevner.  */
+    if (isGenericSmalfilmQuestion(message) || lastAssistantAskedFormat(history)) {
+      const dialogResp = handleSmalfilmDialog(message, history, prices);
+      if (dialogResp) return res.status(200).json(dialogResp);
+    }
+
+    /* 2) FAQ */
     const kbHits = simpleSearch(message, faq);
     if (kbHits?.[0]?.a) {
       return res.status(200).json({ answer: kbHits[0].a, source: "FAQ" });
     }
 
-    /* 2) Prisintents i prioritert rekkefølge */
-    // 2a) 16 mm
+    /* 3) Prisintents */
     const mm16 = parse16mmIntent(message, history);
     if (mm16) {
       return res.status(200).json(price16mm(mm16, prices));
     }
 
-    // 2b) Video
     const v = parseVideoIntent(message);
     if (v) {
       if (v.minutter == null) v.minutter = minutesFromUserHistory(history);
       return res.status(200).json(priceVideo(v, prices));
     }
 
-    // 2c) S8 / 8 mm (smalfilm)
     const s8 = parseS8Intent(message, history);
     if (s8) {
-      // Har vi minutter (fra diametre eller eksplisitt)?
       if (s8.minutter != null) {
-        // Estimer rull-antall dersom ikke oppgitt men diametre finnes
         const r = s8.ruller ?? (s8.diameters.length ? s8.diameters.length : null);
         const resp = priceSmalfilm(s8.minutter, r, prices, true);
-        // legg til veileder for flere ruller hvis ikke alle ble spesifisert
         if (!s8.diameters.length) {
           resp.answer +=
             " Hvis du ikke vet spilletiden: oppgi diametre per rull (7,5 / 12,7 / 14,5 / 17 cm) og om det er 8 mm eller Super 8.";
         }
         return res.status(200).json(resp);
       } else {
-        // Veileder: be om diametre
         const guide = [
           "Kjempefint! For å anslå spilletid per rull: oppgi diametre på spolene og om det er 8 mm eller Super 8.",
           "Tommelverdier pr rull:",
@@ -705,7 +734,7 @@ export default async function handler(req, res) {
       }
     }
 
-    /* 3) LLM fallback (med kort filming/booking-vakt i prompt) */
+    /* 4) LLM fallback */
     const system = [
       'Du er "Luna" – en vennlig og presis AI-assistent for Luna Media (Vestfold).',
       "Svar kort på norsk. Bruk priseksempler og FAQ når relevant.",
@@ -750,15 +779,8 @@ export default async function handler(req, res) {
 
       const text = await resp.text();
       let data;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        throw new Error("OpenAI JSON parse error: " + text);
-      }
-
-      if (!resp.ok) {
-        throw new Error(data?.error?.message || `OpenAI feilkode ${resp.status}`);
-      }
+      try { data = JSON.parse(text); } catch { throw new Error("OpenAI JSON parse error: " + text); }
+      if (!resp.ok) { throw new Error(data?.error?.message || `OpenAI feilkode ${resp.status}`); }
 
       const content = data?.choices?.[0]?.message?.content?.trim();
       if (content) answer = content;
