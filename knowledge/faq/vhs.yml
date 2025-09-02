@@ -1,0 +1,10 @@
+version: 1
+faq:
+  - id: vhs-pris
+    q: "Hva koster det å digitalisere VHS?"
+    alt:
+      - "Pris VHS"
+      - "VHS digitalisering pris"
+    a: |
+      Standardpris er beskrevet i prislisten. Se også rabatt ved større volum.
+    tags: ["vhs", "pris"]
