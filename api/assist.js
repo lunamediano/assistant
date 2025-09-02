@@ -1,3 +1,37 @@
+// api/assist.js
+const useModular = process.env.USE_MODULAR_ASSISTANT === '1';
+
+let modular;
+if (useModular) {
+  try {
+    modular = require('../assistant'); // ../ fra api/ til assistant/
+  } catch (e) {
+    console.error('Kunne ikke laste modular assistant:', e);
+  }
+}
+
+module.exports = async (req, res) => {
+  try {
+    const body = req.body || {};
+    const text = body.text || body.message || '';
+
+    if (useModular && modular && modular.createAssistant) {
+      const assistant = modular.createAssistant();
+      const reply = await assistant.handle({ text });
+      return res.status(200).json(reply);
+    }
+
+    // 🔙 Fallback: eksisterende håndtering (din gamle kode)
+    // ... behold det du har her i dag ...
+    return res.status(200).json({ type: 'answer', text: 'Legacy assist svar (fallback).' });
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal error' });
+  }
+};
+
+
 // /api/assist.js — Luna Media (samlet og oppdatert)
 // --------------------------------------------------
 // Endringer i denne versjonen (sammenlignet med tidligere /api/assist.js):
