@@ -3,6 +3,16 @@
   "version": "1.0.0",
   "private": true,
   "type": "commonjs",
-  "scripts": { … },
-  "dependencies": { … }
+  "scripts": {
+    "dev:check": "node scripts/dev-check.js",
+    "lint": "echo \"(valgfritt) legg til eslint senere\"",
+    "format": "echo \"(valgfritt) legg til prettier senere\"",
+    "start": "node api/assist.js"
+  },
+  "dependencies": {
+    "fast-glob": "^3.3.2",
+    "js-yaml": "^4.1.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {}
 }
