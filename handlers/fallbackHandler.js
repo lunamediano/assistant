@@ -5,4 +5,4 @@ async function handle() {
   };
 }
 
-module.exports = { handle };
+module.exports = { handle }
