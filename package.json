@@ -1,16 +1,9 @@
 {
-  "name": "assistant",
+  "name": "luna-media-assistant",
   "version": "1.0.0",
+  "type": "module",
   "private": true,
-  "type": "commonjs",
-  "scripts": {
-    "dev:check": "node scripts/dev-check.js",
-    "lint": "echo \"(valgfritt) legg til eslint senere\"",
-    "format": "echo \"(valgfritt) legg til prettier senere\""
-  },
   "dependencies": {
-    "fast-glob": "^3.3.2",
-    "js-yaml": "^4.1.0",
-    "zod": "^3.23.8"
+    "js-yaml": "^4.1.0"
   }
 }
