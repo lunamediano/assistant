@@ -21,4 +21,4 @@ module.exports = async (req, res) => {
       error: String(e && e.message ? e.message : e)
     });
   }
-};
+}
