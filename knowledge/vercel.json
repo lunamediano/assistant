@@ -10,8 +10,9 @@
     "api/**/*.{js,ts}": {
       "runtime": "nodejs20.x",
       "includeFiles": [
-        "knowledge/**",
-        "data/**"
+        "core/**",
+        "data/**",
+        "knowledge/**"
       ]
     }
   }
