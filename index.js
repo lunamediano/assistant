@@ -1,6 +1,7 @@
 // assistant/index.js
 const { detectFaq, handleFaq } = require('./handlers/faqHandler');
 const { detectCompanyIntent, handleCompanyIntent } = require('./handlers/companyHandler');
+const { detectPriceIntent, handlePriceIntent } = require('./handlers/priceHandler');
 const { fallbackHandler } = require('./handlers/fallbackHandler');
 const { loadKnowledge } = require('../data/loadData');
 
@@ -9,22 +10,27 @@ function createAssistant() {
 
   return {
     async handle({ text }) {
-      const lower = text.toLowerCase();
+      const lower = (text || '').toLowerCase();
 
       // 1) FAQ
-      const faqMatch = detectFaq(text, data.faq);
-      if (faqMatch) {
-        return handleFaq(faqMatch);
+      const faqMatch = detectFaq(lower, data.faq);
+      if (faqMatch) return handleFaq(faqMatch);
+
+      // 2) Firma / praktisk info
+      const compIntent = detectCompanyIntent(lower);
+      if (compIntent) {
+        const r = handleCompanyIntent(compIntent, data.meta);
+        if (r) return r;
       }
 
-      // 2) Praktisk info (firma / company)
-      const companyIntent = detectCompanyIntent(lower);
-      if (companyIntent) {
-        const reply = handleCompanyIntent(companyIntent, data.meta);
-        if (reply) return reply;
+      // 3) Pris / levering
+      const priceIntent = detectPriceIntent(lower);
+      if (priceIntent) {
+        const r = handlePriceIntent(priceIntent, data.meta);
+        if (r) return r;
       }
 
-      // 3) Fallback
+      // 4) Fallback
       return fallbackHandler(text);
     }
   };
