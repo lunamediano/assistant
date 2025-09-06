@@ -1,3 +1,4 @@
+// data/loadData.js
 const fs = require('fs');
 const path = require('path');
 const fg = require('fast-glob');
@@ -13,8 +14,33 @@ function normalizeFaqItem(entry, file) {
     q,
     a,
     alt: Array.isArray(entry.alt) ? entry.alt : [],
-    tags: Array.isArray(entry.tags) ? entry.tags : []
+    tags: Array.isArray(entry.tags) ? entry.tags : [],
+    source: file
   };
+}
+
+function mergeMeta(into, from, file) {
+  if (!from) return;
+
+  // firma/company
+  const company = from.firma || from.company;
+  if (company) into.company = { ...(into.company || {}), ...company, _source: file };
+
+  // tjenester/services
+  const services = from.tjenester || from.services;
+  if (Array.isArray(services) && services.length) {
+    into.services = [...(into.services || []), ...services.map(s => ({ ...s, _source: file }))];
+  }
+
+  // priser/prices
+  const prices = from.priser || from.prices;
+  if (prices && typeof prices === 'object') {
+    into.prices = { ...(into.prices || {}), ...prices, _source: file };
+  }
+
+  // levering/delivery
+  const delivery = from.levering || from.delivery;
+  if (delivery) into.delivery = { ...(into.delivery || {}), ...delivery, _source: file };
 }
 
 function loadKnowledge() {
@@ -25,12 +51,12 @@ function loadKnowledge() {
     '!' + path.join(baseDir, '**/draft-*.y?(a)ml')
   ];
   const files = fg.sync(patterns, { dot: false, onlyFiles: true });
-
-  files.sort((a, b) => a.localeCompare(b, 'en')); // stabil
+  files.sort((a, b) => a.localeCompare(b, 'en'));
 
   const allFaq = [];
   const byId = new Map();
   const byKey = new Set();
+  const meta = {}; // company, services, prices, delivery
 
   for (const file of files) {
     let raw = '';
@@ -55,20 +81,23 @@ function loadKnowledge() {
       continue;
     }
 
-    for (const entry of parsed.data.faq) {
+    // FAQ
+    for (const entry of parsed.data.faq || []) {
       const item = normalizeFaqItem(entry, file);
       const key = `${item.q}`.trim().toLowerCase();
-      if (byId.has(item.id) || byKey.has(key)) {
-        continue; // duplikat
-      }
+      if (byId.has(item.id) || byKey.has(key)) continue;
       byId.set(item.id, true);
       byKey.add(key);
-      allFaq.push({ ...item, source: file });
+      allFaq.push(item);
     }
+
+    // META
+    mergeMeta(meta, parsed.data, file);
   }
 
   return {
     faq: allFaq,
+    meta,
     count: { faq: allFaq.length },
     files
   };
