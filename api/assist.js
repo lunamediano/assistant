@@ -1,9 +1,8 @@
-// api/assist.js  (CommonJS, trygg for GET/POST)
+// api/assist.js
 module.exports = async (req, res) => {
   const useModular = process.env.USE_MODULAR_ASSISTANT === '1';
 
   try {
-    // Les tekst trygt (fungerer for både GET og POST)
     const method = (req.method || 'GET').toUpperCase();
     const fromQuery = (req.query && (req.query.text || req.query.message)) || '';
     const fromBody =
@@ -15,10 +14,11 @@ module.exports = async (req, res) => {
     if (useModular) {
       let modular = null;
       try {
-        // fra /api til /assistant (én mappe opp)
-        modular = require('../assistant');
+        // FRA: ../assistant
+        // TIL: ../core
+        modular = require('../core');
       } catch (e) {
-        console.error('Kunne ikke require("../assistant"):', e);
+        console.error('Kunne ikke require("../core"):', e);
       }
 
       if (modular && typeof modular.createAssistant === 'function') {
@@ -28,7 +28,6 @@ module.exports = async (req, res) => {
       }
     }
 
-    // Fallback (legacy)
     return res.status(200).json({
       type: 'answer',
       text: 'Legacy assist svar (fallback).'
