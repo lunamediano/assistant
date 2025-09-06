@@ -3,6 +3,7 @@ module.exports = async (req, res) => {
   const useModular = process.env.USE_MODULAR_ASSISTANT === '1';
 
   try {
+    const core = require('./core');
     const method = (req.method || 'GET').toUpperCase();
     const fromQuery = (req.query && (req.query.text || req.query.message)) || '';
     const fromBody =
