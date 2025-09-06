@@ -3,3 +3,4 @@ Test av CI
 tester igjen
 og tester
 Ci-test
+Oppdatert struktur
