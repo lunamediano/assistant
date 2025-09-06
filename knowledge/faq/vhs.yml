@@ -1,10 +1,104 @@
 version: 1
 faq:
+  # --------------- VHS / VIDEO ---------------
   - id: vhs-pris
-    q: "Hva koster det å digitalisere VHS?"
+    q: "Hvor mye koster det å digitalisere en VHS-kassett?"
     alt:
-      - "Pris VHS"
-      - "VHS digitalisering pris"
+      - "pris vhs"
+      - "hva koster digitalisering av videokassett"
+      - "digitalisere vhs pris"
+      - "vhs til usb pris"
+      - "kostnad vhs overføring"
+      - "pris per time vhs"
+      - "videobånd til mp4 pris"
+      - "digitalisere videokassetter pris"
+      - "pris på overføring av vhs"
+      - "hva koster video digitalisering"
     a: |
-      Standardpris er beskrevet i prislisten. Se også rabatt ved større volum.
-    tags: ["vhs", "pris"]
+      Kr 315,- per digitalisert time videoinnhold.
+      Mengderabatt: –10 % fra 10 timer, –20 % fra 20 timer.
+    tags: ["vhs", "pris", "rabatt"]
+
+  - id: vhs-leveringstid
+    q: "Hvor lang tid tar det å digitalisere videokassetter?"
+    alt:
+      - "leveringstid vhs"
+      - "når er kassettene klare"
+      - "hvor raskt får jeg videofilene"
+      - "hvor lang ventetid vhs"
+      - "digitalisere video hvor lenge"
+      - "når kan jeg hente vhs"
+      - "vhs overføring tid"
+      - "leveringstid videokassett"
+      - "gjennomløpstid vhs"
+      - "tid for digitalisering video"
+    a: "Normalt 4–14 dager, maks 3 uker."
+    tags: ["vhs", "leveringstid"]
+
+  - id: vhs-formater
+    q: "Tar dere VHS-C, Video8/Hi8 og MiniDV?"
+    alt:
+      - "digitaliserer dere hi8"
+      - "kan dere ta minidv"
+      - "vhs-c mulig"
+      - "tar dere video8"
+      - "camcorderbånd digitalisering"
+      - "små videokassetter digitalisering"
+      - "mini dv kassetter"
+      - "8mm video til fil"
+      - "digitalisere hi8 og minidv"
+      - "digitalisering av camcorder-tape"
+    a: "Ja. Vi tar VHS/VHS-C, Video8/Hi8, MiniDV m.fl."
+    tags: ["vhs", "vhs-c", "video8", "hi8", "minidv", "formater"]
+
+  - id: vhs-kvalitetsforbedring
+    q: "Kan dere forbedre kvaliteten på video?"
+    alt:
+      - "blir kvaliteten bedre"
+      - "støyreduksjon vhs"
+      - "stabilisering og fargekorrigering"
+      - "kan dere rense opp video"
+      - "fjerne skurr fra vhs"
+      - "bedre bilde fra gamle vhs"
+      - "oppskalere video"
+      - "forbedre skurrete opptak"
+      - "bedre farger på video"
+      - "gjøre vhs penere"
+    a: |
+      Ja. Vi justerer farger/kontrast, stabiliserer og reduserer skurr der det er mulig.
+      Oppskalering til HD kan gjøres ved behov (med KI-verktøy), men vi bevarer alltid en tro kopi av originalen.
+    tags: ["vhs", "kvalitet", "oppskalering"]
+
+  - id: vhs-samle-pa-usb
+    q: "Kan dere legge flere kassetter på én minnepenn?"
+    alt:
+      - "alt på samme minnepenn"
+      - "samle alle filer ett sted"
+      - "en minnepenn for alt"
+      - "alt på en usb"
+      - "får jeg alle videoene samlet"
+      - "slå sammen på minnepenn"
+      - "en stick for alle kassetter"
+      - "alt på en disk"
+      - "samle alle vhs på usb"
+      - "kan dere samle filene"
+    a: |
+      Ja. Vi kan samle alle filer på én USB. Vi har minnepenner opptil 2 TB.
+      Merk at mange TV-er krever FAT32 (MS-DOS), som har 4 GB filgrense – lange opptak deles da i flere filer.
+    tags: ["vhs", "leveranse", "usb", "fat32"]
+
+  - id: vhs-rydde-opptak
+    q: "Hva gjør dere med skurr/blå skjerm og pauser?"
+    alt:
+      - "fjerner dere blanke partier"
+      - "klipper dere bort tomrom"
+      - "håndtering av pauser"
+      - "redigerer dere bort ingenting"
+      - "kan dere fjerne opptak uten innhold"
+      - "rydder dere i opptaket"
+      - "tar dere bort skurr"
+      - "blå skjerm fjernes"
+      - "pauser kuttes"
+      - "tar dere vekk ubrukelig opptak"
+    a: "Vi rydder opp og fjerner skurr, blå sekvenser og partier uten innhold der det gir mening."
+    tags: ["vhs", "redigering", "opprydding"]
