@@ -3,7 +3,6 @@ module.exports = async (req, res) => {
   const useModular = process.env.USE_MODULAR_ASSISTANT === '1';
 
   try {
-    const core = require('./core');
     const method = (req.method || 'GET').toUpperCase();
     const fromQuery = (req.query && (req.query.text || req.query.message)) || '';
     const fromBody =
@@ -15,11 +14,10 @@ module.exports = async (req, res) => {
     if (useModular) {
       let modular = null;
       try {
-        // FRA: ../assistant
-        // TIL: ../core
-        modular = require('../core');
+        // NB: core ligger i api/core, så stien er ./core
+        modular = require('./core');
       } catch (e) {
-        console.error('Kunne ikke require("../core"):', e);
+        console.error('Kunne ikke require("./core"):', e);
       }
 
       if (modular && typeof modular.createAssistant === 'function') {
@@ -29,6 +27,7 @@ module.exports = async (req, res) => {
       }
     }
 
+    // Fallback (legacy)
     return res.status(200).json({
       type: 'answer',
       text: 'Legacy assist svar (fallback).'
