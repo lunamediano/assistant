@@ -1,0 +1,72 @@
+version: 1
+faq:
+  # --------------- FOTO / DIAS / NEGATIVER ---------------
+  - id: foto-digitalisering
+    q: "Skanner dere papirbilder, lysbilder og negativer?"
+    alt:
+      - "digitalisere dias"
+      - "skanne negativer"
+      - "skanning av gamle bilder"
+      - "skanne papirbilder"
+      - "overføre lysbilder"
+      - "scan dias til fil"
+      - "digitalisere gamle foto"
+      - "negativer til digitale filer"
+      - "foto skanning"
+      - "bilder til digital fil"
+    a: |
+      Ja. Vi skanner papirbilder, lysbilder/dias og negativer, i den kvaliteten og størrelsen du ønsker.
+    tags: ["foto", "dias", "negativer", "tjenester"]
+
+  - id: foto-pris-opplosning
+    q: "Hva koster fotoskanning, og i hvilken oppløsning leverer dere?"
+    alt:
+      - "pris skanning foto"
+      - "dpi kvalitet"
+      - "oppløsning på bildene"
+      - "skanne bilder pris"
+      - "skanning av dias pris"
+      - "negativer scanning pris"
+      - "foto scanning oppløsning"
+      - "valg av dpi"
+      - "bildekvalitet ved skanning"
+      - "fotodigitalisering pris"
+    a: |
+      Rimeligste alternativ fra ca. kr 10,- per bilde/dias (inkl. mva).
+      Du får det i den oppløsningen du ønsker – tilpasset om du skal bruke bildene som utskrifter eller digitalt.
+    tags: ["foto", "dias", "negativer", "pris", "oppløsning"]
+
+  - id: foto-film
+    q: "Kan dere lage film av mine bilder – med musikk og kommentarer?"
+    alt:
+      - "slideshow film av bilder"
+      - "lage film av foto"
+      - "bilder til video med musikk"
+      - "kommentarer på bildeserie"
+      - "tale over bilder"
+      - "fotofilm med musikk"
+      - "presentasjon av bilder som film"
+      - "dias til film"
+      - "historiefilm av foto"
+      - "foto og musikk film"
+    a: |
+      Ja. Vi lager flotte filmer av bildene dine med musikk, voiceover og titler.
+      Leveres på minnepenn slik at du enkelt kan se den på Smart-TV.
+    tags: ["foto", "film", "slideshow", "musikk", "voiceover"]
+
+  - id: foto-retusjering
+    q: "Tilbyr dere retusjering og fargekorrigering av bilder?"
+    alt:
+      - "reparere riper og støv"
+      - "forbedre gamle bilder"
+      - "restaurering av foto"
+      - "retusjere gamle fotografier"
+      - "fargekorrigering av foto"
+      - "fikse bleknet bilde"
+      - "gjenopprette gamle foto"
+      - "bildereparasjon"
+      - "støvfjerning fra skann"
+      - "fotorestaurering"
+    a: |
+      Ja. Vi retusjerer og fargekorrigerer, og kan levere nye utskrifter i "fine art"-kvalitet med holdbarhetsgaranti.
+    tags: ["foto", "retusjering", "restaurering", "kvalitet"]
