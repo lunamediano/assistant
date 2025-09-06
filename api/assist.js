@@ -14,7 +14,7 @@ module.exports = async (req, res) => {
     if (useModular) {
       let modular = null;
       try {
-        // NB: core ligger i api/core, så stien er ./core
+        // NB: core ligger i api/core → bruk ./core
         modular = require('./core');
       } catch (e) {
         console.error('Kunne ikke require("./core"):', e);
