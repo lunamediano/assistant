@@ -1,0 +1,66 @@
+version: 1
+faq:
+  # --------------- SPESIAL / PRODUKSJON ---------------
+  - id: spesial-med-egne-ord
+    q: "Hva er «Med egne ord»?"
+    alt:
+      - "med egne ord tjeneste"
+      - "hva betyr med egne ord"
+      - "kan dere ta opp min historie"
+      - "intervju og fortelling film"
+      - "familiehistorie film"
+      - "minnefilm tjeneste"
+      - "personlig historie video"
+      - "samtale på film"
+      - "opptak av tale"
+      - "fortellerfilm"
+    a: |
+      "Med egne ord" er en tjeneste hvor vi dokumenterer din personlige historie.
+      Resultatet er en ferdig film med lyd, titler og eventuelt bilder/klipp.
+      En fantastisk gave til familie og/eller venner.
+    tags: ["spesial", "med egne ord", "minnefilm", "intervju"]
+
+  - id: spesial-bryllup-konfirmasjon
+    q: "Lager dere film til bryllup og konfirmasjon?"
+    alt:
+      - "bryllupsvideo"
+      - "konfirmasjonsfilm"
+      - "videograf bryllup"
+      - "film til selskap"
+      - "høytidsfilm"
+      - "seremoni og fest film"
+      - "video til feiring"
+      - "bryllupsfilm pris"
+      - "konfirmasjon video opptak"
+      - "redigering av bryllupsfilm"
+    a: |
+      Ja. Vi kan filme, klippe og levere en fin film klar til visning og deling.
+    tags: ["spesial", "bryllup", "konfirmasjon", "arrangement"]
+
+  - id: spesial-bedrift
+    q: "Tilbyr dere videoproduksjon for bedrift/organisasjon?"
+    alt:
+      - "bedriftsfilm"
+      - "innholdsfilm"
+      - "informasjonsvideo"
+      - "produktfilm"
+      - "rekrutteringsfilm"
+      - "profilfilm"
+      - "video for sosiale medier"
+      - "firmafilm"
+      - "presentasjonsfilm"
+      - "videoopptak bedrift"
+    a: |
+      Ja. Vi bistår i planleggingen, og tar oss av opptak og etterarbeid –
+      fra korte innholdsfilmer til informasjonsvideoer og profilfilm.
+    tags: ["spesial", "bedrift", "produksjon", "video"]
+
+  - id: spesial-drone
+    q: "Tar dere droneopptak (stillbilder og video)?"
+    alt:
+      - "dronefoto"
+      - "dronevideo"
+      - "luftfoto eiendom"
+      - "drone 4k"
+      - "flyfoto"
+      - "dro
