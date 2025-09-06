@@ -1,25 +1,41 @@
 // assistant/handlers/companyHandler.js
 const { loadKnowledge } = require('../../data/loadData');
 
-function detectCompanyIntent(text) {
-  const lower = text.toLowerCase();
+function norm(s) {
+  return (s || '')
+    .toLowerCase()
+    .normalize('NFKD')               // skill diakritikk ut (å -> a + ring)
+    .replace(/[^\p{Letter}\p{Number}\s]/gu, ' ') // fjern tegnsetting
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
-  if (lower.includes('adresse') || lower.includes('hvor ligger') || lower.includes('hvor kan jeg levere')) {
+function has(text, ...needles) {
+  const t = norm(text);
+  return needles.some(n => t.includes(norm(n)));
+}
+
+function detectCompanyIntent(text) {
+  // Adresse / levering til sted
+  if (has(text, 'adresse', 'adressen', 'hvor kan jeg levere', 'hvor levere', 'hvor ligger dere')) {
     return 'company_address';
   }
-  if (lower.includes('åpningstid') || lower.includes('åpent') || lower.includes('når har dere åpent')) {
+  // Åpningstider / når åpent
+  if (has(text, 'åpningstid', 'apningstid', 'åpent', 'apent', 'når har dere åpent', 'nar har dere apent')) {
     return 'company_hours';
   }
-  if (lower.includes('telefon') || lower.includes('nummer') || lower.includes('ring')) {
+  // Telefon
+  if (has(text, 'telefon', 'telefonnummer', 'ring', 'nummeret deres')) {
     return 'company_phone';
   }
-  if (lower.includes('epost') || lower.includes('email') || lower.includes('mail')) {
+  // E-post
+  if (has(text, 'epost', 'e-post', 'email', 'mail')) {
     return 'company_email';
   }
-  if (lower.includes('leveringstid') || lower.includes('hvor lang tid')) {
+  // Leveringstid (praktisk)
+  if (has(text, 'leveringstid', 'hvor lang tid', 'når ferdig')) {
     return 'company_delivery';
   }
-
   return null;
 }
 
@@ -28,38 +44,38 @@ function handleCompanyIntent(intent, meta) {
 
   const c = meta.company;
   const d = meta.delivery || {};
-  const p = meta.prices || {};
 
   switch (intent) {
     case 'company_address':
       return {
         type: 'answer',
-        text: `Du kan levere hos oss på:\n\n- ${c.adresser?.tonsberg}\n- ${c.adresser?.oslo}\n\nVi tar også imot postforsendelser.`,
+        text:
+          `Du kan levere hos oss på:\n\n` +
+          (c.adresser?.tonsberg ? `• ${c.adresser.tonsberg}\n` : '') +
+          (c.adresser?.oslo ? `• ${c.adresser.oslo}\n` : '') +
+          `\nVi tar også imot postforsendelser.`,
         meta: { source: c._source }
       };
     case 'company_hours':
       return {
         type: 'answer',
-        text: `Våre åpningstider er:\n- Hverdager: ${c.apningstider?.hverdager}\n- Lørdag: ${c.apningstider?.lordag}\n- Søndag: ${c.apningstider?.sondag}`,
+        text:
+          `Våre åpningstider:\n` +
+          (c.apningstider?.hverdager ? `• Hverdager: ${c.apningstider.hverdager}\n` : '') +
+          (c.apningstider?.lordag ? `• Lørdag: ${c.apningstider.lordag}\n` : '') +
+          (c.apningstider?.sondag ? `• Søndag: ${c.apningstider.sondag}\n` : ''),
         meta: { source: c._source }
       };
     case 'company_phone':
-      return {
-        type: 'answer',
-        text: `Telefonnummeret vårt er ${c.telefon}.`,
-        meta: { source: c._source }
-      };
+      return { type: 'answer', text: `Telefon: ${c.telefon}`, meta: { source: c._source } };
     case 'company_email':
-      return {
-        type: 'answer',
-        text: `Du kan kontakte oss på e-post: ${c.epost}`,
-        meta: { source: c._source }
-      };
+      return { type: 'answer', text: `E-post: ${c.epost}`, meta: { source: c._source } };
     case 'company_delivery':
       return {
         type: 'answer',
-        text: `Leveringstid er normalt ${d.standard_dager || 'noen dager'}. ` +
-              (d.rush_mulig ? `Ekspress er mulig (${d.rush_tillegg}).` : ''),
+        text:
+          `Leveringstid er normalt ${d.standard_dager || 'noen dager'}. ` +
+          (d.rush_mulig ? `Ekspress kan være mulig (${d.rush_tillegg}).` : ''),
         meta: { source: d._source || c._source }
       };
     default:
