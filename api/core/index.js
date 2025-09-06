@@ -3,7 +3,7 @@ const { detectFaq, handleFaq } = require('./handlers/faqHandler');
 const { detectCompanyIntent, handleCompanyIntent } = require('./handlers/companyHandler');
 const { detectPriceIntent, handlePriceIntent } = require('./handlers/priceHandler');
 const { fallbackHandler } = require('./handlers/fallbackHandler');
-const { loadKnowledge } = require('../data/loadData');
+const { loadKnowledge } = require('../../data/loadData');
 
 const DEBUG = process.env.DEBUG_ASSISTANT === '1';
 
