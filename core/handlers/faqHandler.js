@@ -1,38 +1,73 @@
-function score(text, item) {
-  const t = text.toLowerCase();
-  let s = 0;
-  if (item.q) s += t.includes(item.q.toLowerCase()) ? 3 : 0;
-  for (const alt of item.alt || []) s += t.includes((alt || '').toLowerCase()) ? 1 : 0;
-  for (const tag of item.tags || []) s += t.includes((tag || '').toLowerCase()) ? 0.5 : 0;
-  return s;
+// core/handlers/faqHandler.js
+
+function normalize(s) {
+  return (s || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^\p{Letter}\p{Number}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
-async function handle({ message, ctx }) {
-  const text = message.text || '';
+function tokenSet(str) {
+  return new Set(normalize(str).split(' ').filter(Boolean));
+}
 
-  const ranked = ctx.knowledge.faq
-    .map(item => ({ item, score: score(text, item) }))
-    .filter(x => x.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 3);
+function jaccard(a, b) {
+  const A = tokenSet(a), B = tokenSet(b);
+  let inter = 0;
+  for (const t of A) if (B.has(t)) inter++;
+  const uni = A.size + B.size - inter;
+  return uni === 0 ? 0 : inter / uni;
+}
 
-  if (ranked.length === 0) {
-    return {
-      type: 'answer',
-      text: 'Jeg fant ingen direkte match i kunnskapsbasen. Kan du si litt mer spesifikt?'
-    };
+// Finn beste match i faq-lista (bruker q + alt)
+function detectFaq(userText, faqList) {
+  if (!userText || !Array.isArray(faqList) || faqList.length === 0) return null;
+
+  const qn = normalize(userText);
+  let bestItem = null;
+  let bestScore = 0;
+
+  for (const item of faqList) {
+    const baseQ = item.q || '';
+    const baseScore = jaccard(qn, baseQ);
+
+    let altScore = 0;
+    for (const alt of item.alt || []) {
+      altScore = Math.max(altScore, jaccard(qn, alt));
+      // Litt ekstra hvis “inneholder”
+      if (normalize(alt).includes(qn) || qn.includes(normalize(alt))) {
+        altScore = Math.max(altScore, 0.75);
+      }
+    }
+
+    // Bonus dersom hele spørsmålet er inneholdt
+    const containsBonus =
+      normalize(baseQ).includes(qn) || qn.includes(normalize(baseQ)) ? 0.15 : 0;
+
+    const score = Math.max(baseScore + containsBonus, altScore);
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestItem = item;
+    }
   }
 
-  const best = ranked[0].item;
+  // terskel for “god nok” match
+  return bestScore >= 0.40 ? bestItem : null;
+}
+
+function handleFaq(item) {
   return {
     type: 'answer',
-    text: best.a,
+    text: (item.a || '').endsWith('\n') ? item.a : (item.a || '') + '\n',
     meta: {
-      matched_question: best.q,
-      source: best.source,
-      related: ranked.slice(1).map(x => ({ q: x.item.q, source: x.item.source }))
+      matched_question: item.q,
+      source: item._source || item.source || item.src,
+      related: (item.related || []).slice(0, 3)
     }
   };
 }
 
-module.exports = { handle };
+module.exports = { detectFaq, handleFaq };
