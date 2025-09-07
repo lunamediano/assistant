@@ -6,7 +6,7 @@ module.exports = async (req, res) => {
   // Bakoverkompatibel toggle: USE_MODULAR_ASSISTANT=1/true
   const legacyFlag = (process.env.USE_MODULAR_ASSISTANT || '').toLowerCase().trim();
 
-  const useModular =
+  const useModular = true;
     mode === 'modular' ||
     legacyFlag === '1' ||
     legacyFlag === 'true';
