@@ -21,3 +21,5 @@ Dette repoet inneholder:
 
 ## Slå på ekte AI (valgfritt)
 - Fjern kommenteringen i `/api/assist.js` og legg til pakken `openai` i `package.json`.
+
+Deployed with USE_MODULAR_ASSISTANT=1
