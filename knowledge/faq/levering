@@ -1,0 +1,56 @@
+version: 1
+faq:
+  # --------------- LEVERING / PRAKTISK ---------------
+  - id: levering-hvor
+    q: "Hvor kan jeg levere?"
+    alt:
+      - "adresse oslo"
+      - "adresse tønsberg"
+      - "innlevering hos dere"
+      - "leveringssteder luna media"
+      - "kan jeg levere i oslo"
+      - "hvor levere i tønsberg"
+      - "leveringsadresse"
+      - "kontor i oslo eller tønsberg"
+      - "innlevering video oslo"
+      - "hvor levere smalfilm"
+    a: |
+      Du kan levere hos oss på Sem Senteret (2. etg.), Andebuveien 3, 3170 Sem.
+      Vi har også en egen desk på Bislett i Oslo (etter avtale).
+      Vi tar i tillegg imot postforsendelser.
+    tags: ["levering", "praktisk", "adresse", "oslo", "tønsberg"]
+
+  - id: levering-avtale
+    q: "Må jeg avtale tid før levering og henting?"
+    alt:
+      - "åpningstider"
+      - "kan jeg komme når som helst"
+      - "booking av levering"
+      - "må jeg ringe først"
+      - "trenger jeg avtale tid"
+      - "når har dere åpent"
+      - "henting avtale"
+      - "besøke uten avtale"
+      - "åpent i dag"
+      - "timebestilling levering"
+    a: |
+      Ring gjerne på forhånd.
+      Våre åpningstider er mandag–fredag kl. 10–16 (torsdag til kl. 18).
+    tags: ["levering", "praktisk", "åpningstider", "henting"]
+
+  - id: levering-post
+    q: "Kan dere sende filer/minnepenn i posten?"
+    alt:
+      - "postforsendelse"
+      - "kan dere sende minnepenn"
+      - "frakt og retur"
+      - "kan jeg få sendt filene"
+      - "sender dere i posten"
+      - "levering via post"
+      - "retur i posten"
+      - "sende usb hjem"
+      - "post med sporing"
+      - "kan dere sende alt hjem"
+    a: |
+      Ja. Vi sender gjerne filer eller minnepenner i posten.
+      Vi bruker Norgesp

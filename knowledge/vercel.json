@@ -1,17 +1,20 @@
 {
   "version": 2,
   "builds": [
-    { "src": "api/assist.js", "use": "@vercel/node" }
+    { "src": "api/*.js", "use": "@vercel/node" },
+    { "src": "api/debug/*.js", "use": "@vercel/node" }
   ],
   "routes": [
-    { "src": "/api/assist", "dest": "/api/assist.js" }
+    { "src": "/api/(.*)", "dest": "/api/$1" }
   ],
   "functions": {
-    "api/assist.js": {
-      "includeFiles": [
-        "knowledge/**",
-        "data/**"
-      ]
+    "api/*.js": {
+      "runtime": "nodejs20.x",
+      "includeFiles": ["core/**", "data/**", "knowledge/**"]
+    },
+    "api/debug/*.js": {
+      "runtime": "nodejs20.x",
+      "includeFiles": ["core/**", "data/**", "knowledge/**"]
     }
   }
 }

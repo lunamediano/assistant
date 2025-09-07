@@ -1,0 +1,96 @@
+// core/handlers/companyHandler.js
+function norm(s) {
+  return (s || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^\p{Letter}\p{Number}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+function has(text, ...needles) {
+  const t = norm(text);
+  return needles.some(n => t.includes(norm(n)));
+}
+
+function detectCompanyIntent(text) {
+  // Adresse / levering til sted
+  if (has(text, 'adresse', 'adressen', 'hvor kan jeg levere', 'hvor levere', 'hvor ligger dere')) {
+    return 'company_address';
+  }
+  // Åpningstider / når åpent
+  if (has(text, 'åpningstid', 'apningstid', 'åpent', 'apent', 'når har dere åpent', 'nar har dere apent')) {
+    return 'company_hours';
+  }
+  // Telefon
+  if (has(text, 'telefon', 'telefonnummer', 'ring', 'nummeret deres')) {
+    return 'company_phone';
+  }
+  // E-post
+  if (has(text, 'epost', 'e-post', 'email', 'mail')) {
+    return 'company_email';
+  }
+  // Leveringstid (praktisk)
+  if (has(text, 'leveringstid', 'hvor lang tid', 'når ferdig')) {
+    return 'company_delivery';
+  }
+  return null;
+}
+
+function handleCompanyIntent(intent, meta) {
+  if (!meta || !meta.company) return null;
+
+  const c = meta.company;
+  const d = meta.delivery || {};
+
+  switch (intent) {
+    case 'company_address':
+      return {
+        type: 'answer',
+        text:
+          `Du kan levere hos oss på:\n\n` +
+          (c.adresser?.tonsberg ? `• ${c.adresser.tonsberg}\n` : '') +
+          (c.adresser?.oslo ? `• ${c.adresser.oslo}\n` : '') +
+          `\nVi tar også imot postforsendelser.`,
+        meta: { source: c._source }
+      };
+
+    case 'company_hours':
+      return {
+        type: 'answer',
+        text:
+          `Våre åpningstider:\n` +
+          (c.apningstider?.hverdager ? `• Hverdager: ${c.apningstider.hverdager}\n` : '') +
+          (c.apningstider?.lordag ? `• Lørdag: ${c.apningstider.lordag}\n` : '') +
+          (c.apningstider?.sondag ? `• Søndag: ${c.apningstider.sondag}\n` : ''),
+        meta: { source: c._source }
+      };
+
+    case 'company_phone':
+      return {
+        type: 'answer',
+        text: `Telefon: ${c.telefon}`,
+        meta: { source: c._source }
+      };
+
+    case 'company_email':
+      return {
+        type: 'answer',
+        text: `E-post: ${c.epost}`,
+        meta: { source: c._source }
+      };
+
+    case 'company_delivery':
+      return {
+        type: 'answer',
+        text:
+          `Leveringstid er normalt ${d.standard_dager || 'noen dager'}. ` +
+          (d.rush_mulig ? `Ekspress kan være mulig (${d.rush_tillegg}).` : ''),
+        meta: { source: d._source || c._source }
+      };
+
+    default:
+      return null;
+  }
+}
+
+module.exports = { detectCompanyIntent, handleCompanyIntent };
