@@ -1,9 +1,10 @@
 // api/debug/which.js
 module.exports = async (req, res) => {
-  let info = { ok: true, required: null, hasCreate: false, error: null };
+  const info = { ok: true, required: null, hasCreate: false, error: null };
 
   try {
-    const core = require('../core'); // <- MÅ lykkes
+    // NB: which.js ligger i api/debug → to nivå opp til /core
+    const core = require('../../core');
     info.required = Object.keys(core);
     info.hasCreate = typeof core.createAssistant === 'function';
   } catch (e) {
