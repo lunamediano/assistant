@@ -1,4 +1,5 @@
 // core/index.js
+const { loadKnowledge } = require('../data/loadData');
 const { detectFaq, handleFaq } = require('./handlers/faqHandler');
 const { detectCompanyIntent, handleCompanyIntent } = require('./handlers/companyHandler');
 const { detectPriceIntent, handlePriceIntent } = require('./handlers/priceHandler');
