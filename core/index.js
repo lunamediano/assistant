@@ -1,15 +1,14 @@
 // core/index.js
-const { loadKnowledge } = require('../data/loadData');
 const { detectFaq, handleFaq } = require('./handlers/faqHandler');
 const { detectCompanyIntent, handleCompanyIntent } = require('./handlers/companyHandler');
 const { detectPriceIntent, handlePriceIntent } = require('./handlers/priceHandler');
 const { fallbackHandler } = require('./handlers/fallbackHandler');
-const { loadKnowledge } = require('../../data/loadData'); // to nivå opp
+const { loadKnowledge } = require('../data/loadData'); // NB: én gang, riktig sti
 
-const DEBUG = process.env.DEBUG_ASSISTANT === '1';
+const DEBUG = (process.env.DEBUG_ASSISTANT || '').toLowerCase() === '1';
 
 function createAssistant() {
-  // Last kunnskap én gang pr. instans
+  // Last kunnskapen én gang per instans
   const data = loadKnowledge();
 
   return {
@@ -25,7 +24,7 @@ function createAssistant() {
           return handleFaq(faqMatch);
         }
 
-        // 2) Firma / praktisk (adresse, tider, telefon, e-post, leveringstid)
+        // 2) Firma / praktisk
         const compIntent = detectCompanyIntent(lower);
         if (compIntent) {
           DEBUG && console.log('[route] company ->', compIntent);
@@ -33,7 +32,7 @@ function createAssistant() {
           if (r) return r;
         }
 
-        // 3) Pris / kategorier (USB, VHS/Video, Smalfilm, Foto) + oversikt
+        // 3) Pris / levering
         const priceIntent = detectPriceIntent(lower);
         if (priceIntent) {
           DEBUG && console.log('[route] price ->', priceIntent);
@@ -41,7 +40,7 @@ function createAssistant() {
           if (r) return r;
         }
 
-        // 4) Fallback (høflig og sikker)
+        // 4) Fallback
         DEBUG && console.log('[route] fallback');
         return fallbackHandler(input);
       } catch (err) {
