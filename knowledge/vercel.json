@@ -10,11 +10,11 @@
   "functions": {
     "api/*.js": {
       "runtime": "nodejs20.x",
-      "includeFiles": ["api/core/**", "data/**", "knowledge/**"]
+      "includeFiles": ["core/**", "data/**", "knowledge/**"]
     },
     "api/debug/*.js": {
       "runtime": "nodejs20.x",
-      "includeFiles": ["api/core/**", "data/**", "knowledge/**"]
+      "includeFiles": ["core/**", "data/**", "knowledge/**"]
     }
   }
 }
