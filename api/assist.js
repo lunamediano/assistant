@@ -1,16 +1,23 @@
 // api/assist.js
 module.exports = async (req, res) => {
-  // Tillat både "1" og "true"
-  const flag = (process.env.USE_MODULAR_ASSISTANT || '').toLowerCase();
-  const useModular = flag === '1' || flag === 'true';
+  // Ny, robust toggle: ASSISTANT_MODE=modular
+  const mode = (process.env.ASSISTANT_MODE || '').toLowerCase().trim();
+
+  // Bakoverkompatibel toggle: USE_MODULAR_ASSISTANT=1/true
+  const legacyFlag = (process.env.USE_MODULAR_ASSISTANT || '').toLowerCase().trim();
+
+  const useModular =
+    mode === 'modular' ||
+    legacyFlag === '1' ||
+    legacyFlag === 'true';
 
   try {
-    // --- Hent tekst fra GET eller POST (tåler body som string/JSON) ---
+    // --- Les input trygt (både GET og POST / raw string eller JSON body) ---
     const method = (req.method || 'GET').toUpperCase();
 
     let body = req.body;
     if (typeof body === 'string') {
-      try { body = JSON.parse(body); } catch { /* ignorér */ }
+      try { body = JSON.parse(body); } catch { /* ignorér hvis ikke JSON */ }
     }
 
     const fromQuery =
@@ -21,18 +28,18 @@ module.exports = async (req, res) => {
 
     const text = method === 'GET' ? fromQuery : fromBody;
 
-    // --- Bruk modulær kjerne hvis flagget er på ---
+    // --- Modulær kjerne ---
     if (useModular) {
-      let modular = null;
+      let core = null;
       try {
-        // NB: kjernen ligger i ../core (én mappe opp fra api/)
-        modular = require('../core');
+        // Kjernen ligger i ../core (én mappe opp fra api/)
+        core = require('../core');
       } catch (e) {
         console.error('Kunne ikke require("../core"):', e);
       }
 
-      if (modular && typeof modular.createAssistant === 'function') {
-        const assistant = modular.createAssistant();
+      if (core && typeof core.createAssistant === 'function') {
+        const assistant = core.createAssistant();
         const reply = await assistant.handle({ text: String(text || '') });
         return res.status(200).json(reply);
       }
