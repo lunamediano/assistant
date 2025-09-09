@@ -1,15 +1,32 @@
 // api/debug/which.js
+const ALLOWED_ORIGINS = [
+  'https://h05693dfe8-staging.onrocket.site',
+];
+function applyCors(req, res) {
+  const origin = req.headers.origin || '';
+  if (ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
+
 module.exports = async (req, res) => {
-  const info = { ok: true, required: null, hasCreate: false, error: null };
+  applyCors(req, res);
+  if (req.method === 'OPTIONS') return res.status(204).end();
+
+  let required = [];
+  let hasCreate = false;
+  let error = null;
 
   try {
-    // NB: which.js ligger i api/debug → to nivå opp til /core
     const core = require('../../core');
-    info.required = Object.keys(core);
-    info.hasCreate = typeof core.createAssistant === 'function';
+    required = Object.keys(core);
+    hasCreate = typeof core.createAssistant === 'function';
   } catch (e) {
-    info.error = String(e && e.message ? e.message : e);
+    error = String(e && e.message ? e.message : e);
   }
 
-  res.status(200).json(info);
+  res.status(200).json({ ok: true, required, hasCreate, error });
 };
