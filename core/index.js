@@ -2,7 +2,11 @@
 const { detectFaq, handleFaq } = require('./handlers/faqHandler');
 const { detectCompanyIntent, handleCompanyIntent } = require('./handlers/companyHandler');
 const { detectPriceIntent, handlePriceIntent } = require('./handlers/priceHandler');
-const { fallbackHandler } = require('./handlers/fallbackHandler');
+
+// Robust import: støtt både named og default
+const fb = require('./handlers/fallbackHandler');
+const fallbackHandler = fb.fallbackHandler || fb.default || fb;
+
 const { loadKnowledge } = require('../data/loadData');
 
 const DEBUG = (process.env.DEBUG_ASSISTANT || '').toLowerCase() === '1';
