@@ -3,6 +3,9 @@ const ALLOWED_ORIGINS = [
   'https://h05693dfe8-staging.onrocket.site',
 ];
 
+// tving bundleren til å inkludere core i lambdaen
+try { require('../core'); } catch {}
+
 function applyCors(req, res) {
   const origin = req.headers.origin || '';
   if (ALLOWED_ORIGINS.includes(origin)) {
