@@ -14,18 +14,24 @@ function applyCors(req, res) {
 }
 
 function tryLoadKnowledge() {
+  // Try both relative and absolute (Vercel bundle) paths
   const tries = [
-    '../../core/data/loadData', // api/debug/* -> ../../core
-    '../core/data/loadData',    // api/* -> ../core (i noen bygg)
-    '../../data/loadData',      // hvis data ligger på toppnivå
+    // relative from /api/debug/*
+    '../../core/data/loadData',
+    '../core/data/loadData',
+    '../../data/loadData',
     '../data/loadData',
+    // absolute fallback in Vercel lambdas
+    '/var/task/core/data/loadData',
+    '/var/task/data/loadData',
   ];
+
   const errors = [];
   for (const p of tries) {
     try {
       // eslint-disable-next-line import/no-dynamic-require, global-require
       const { loadKnowledge } = require(p);
-      return { loadKnowledge, path: p };
+      return { loadKnowledge, pathTried: p };
     } catch (e) {
       errors.push(`${p}: ${e && e.message ? e.message : e}`);
     }
@@ -40,7 +46,7 @@ module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(204).end();
 
   try {
-    const { loadKnowledge, path } = tryLoadKnowledge();
+    const { loadKnowledge, pathTried } = tryLoadKnowledge();
     const data = loadKnowledge();
 
     const faq = Array.isArray(data?.faq) ? data.faq : [];
@@ -49,9 +55,9 @@ module.exports = async (req, res) => {
     const prices = meta.prices || {};
     const delivery = meta.delivery || {};
 
-    return res.status(200).json({
+    res.status(200).json({
       ok: true,
-      loaderPath: path,
+      loaderPath: pathTried,
       faqCount: faq.length,
       sample: faq.slice(0, 5).map(x => ({
         id: x.id || null,
@@ -68,7 +74,7 @@ module.exports = async (req, res) => {
       },
     });
   } catch (e) {
-    return res.status(200).json({
+    res.status(200).json({
       ok: false,
       error: String(e && e.message ? e.message : e),
       details: e?.details || null,
