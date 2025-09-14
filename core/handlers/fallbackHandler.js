@@ -1,8 +1,10 @@
-async function handle() {
-  return {
-    type: 'answer',
-    text: 'Jeg er ikke helt sikker – men jeg kan sjekke kunnskapsbasen nærmere om du spesifiserer hva du lurer på.'
-  };
+// core/handlers/fallbackHandler.js
+function fallbackHandler(input) {
+  const polite =
+    'Jeg er ikke helt sikker – men jeg kan sjekke kunnskapsbasen nærmere om du spesifiserer hva du lurer på.';
+  return { type: 'answer', text: polite };
 }
 
-module.exports = { handle };
+// Eksporter både named og default for å være kompatibel uansett import
+module.exports = { fallbackHandler };
+module.exports.default = fallbackHandler;
