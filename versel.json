@@ -1,0 +1,12 @@
+{
+  "functions": {
+    "api/**/*.js": {
+      "runtime": "nodejs20.x",
+      "includeFiles": [
+        "core/**",
+        "data/**",
+        "knowledge/**"
+      ]
+    }
+  }
+}
