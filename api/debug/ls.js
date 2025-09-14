@@ -30,6 +30,11 @@ module.exports = async (req, res) => {
   cors(req, res);
   if (req.method === 'OPTIONS') return res.status(204).end();
 
+  module.exports.config = {
+  runtime: 'nodejs20.x',
+  includeFiles: ['api/core/**','api/data/**','api/knowledge/**'],
+};
+
   const pattern = String((req.query && req.query.pattern) || '').toLowerCase() || null;
   const roots = ['/var/task', '/var/task/api', '/var/task/core', path.dirname(__dirname)];
   const results = {};
