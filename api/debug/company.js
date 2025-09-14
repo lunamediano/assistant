@@ -28,8 +28,8 @@ module.exports = async (_req, res) => {
   }
 };
 
-// --- Vercel bundle-hint
+// ...filinnholdet ditt...
 module.exports.config = {
   runtime: 'nodejs20.x',
-  includeFiles: ['core/**', 'data/**', 'knowledge/**'],
+  includeFiles: ['api/core/**','api/data/**','api/knowledge/**'],
 };
