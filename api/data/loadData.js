@@ -5,6 +5,15 @@ const fg = require('fast-glob');
 const YAML = require('js-yaml');
 const { KnowledgeDoc } = require('./schema');
 
+// peker til api/knowledge
+const KNOWLEDGE_DIR = path.join(__dirname, '..', 'knowledge');
+
+function loadYaml(file) {
+  const full = path.join(KNOWLEDGE_DIR, file);
+  const raw = fs.readFileSync(full, 'utf8');
+  return YAML.parse(raw);
+}
+
 function normalizeFaqItem(entry, file) {
   const q = entry.q || entry.question;
   const a = entry.a || entry.answer;
