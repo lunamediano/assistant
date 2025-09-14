@@ -1,31 +1,35 @@
 // api/debug/company.js
-const { loadKnowledge } = require('../../data/loadData');
+// Leser meta/firma-info fra loadKnowledge()
 
-const ALLOWED_ORIGINS = [
-  'https://h05693dfe8-staging.onrocket.site',
-];
-function applyCors(req, res) {
-  const origin = req.headers.origin || '';
-  if (ALLOWED_ORIGINS.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Vary', 'Origin');
+function tryLoadKnowledge() {
+  // fra api/debug/* er veien til data/* to nivåer opp
+  const tries = ['../../data/loadData', '../data/loadData', '/var/task/data/loadData'];
+  for (const p of tries) {
+    try { return require(p).loadKnowledge; } catch {}
   }
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  return null;
 }
 
-module.exports = async (req, res) => {
-  applyCors(req, res);
-  if (req.method === 'OPTIONS') return res.status(204).end();
+module.exports = async (_req, res) => {
+  const loadKnowledge = tryLoadKnowledge();
+  if (!loadKnowledge) {
+    return res.status(500).json({ ok: false, error: 'Finner ikke loadKnowledge()' });
+  }
+  try {
+    const data = loadKnowledge(); // synkron i vår kode
+    res.status(200).json({
+      ok: true,
+      hasCompany: !!data?.meta?.company,
+      company: data?.meta?.company || null,
+      sources: data?.meta?._source ? 1 : 0,
+    });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+};
 
-  const data = loadKnowledge();
-  res.status(200).json({
-    ok: true,
-    hasCompany: !!data.meta,
-    company: data.meta || null,
-    services: data.services || [],
-    prices: data.prices || {},
-    delivery: data.delivery || {},
-    sources: data.sources ? data.sources.length : 0,
-  });
+// --- Vercel bundle-hint
+module.exports.config = {
+  runtime: 'nodejs20.x',
+  includeFiles: ['core/**', 'data/**', 'knowledge/**'],
 };
