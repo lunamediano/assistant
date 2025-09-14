@@ -1,115 +1,88 @@
-// data/loadData.js
+// api/data/loadData.js
 const fs = require('fs');
 const path = require('path');
 const fg = require('fast-glob');
 const YAML = require('js-yaml');
 const { KnowledgeDoc } = require('./schema');
 
-// peker til api/knowledge
-const KNOWLEDGE_DIR = path.join(__dirname, '..', 'knowledge');
-
-function loadYaml(file) {
-  const full = path.join(KNOWLEDGE_DIR, file);
-  const raw = fs.readFileSync(full, 'utf8');
-  return YAML.parse(raw);
-}
+const KNOWLEDGE_DIR = path.join(__dirname, 'knowledge'); // api/data/knowledge
 
 function normalizeFaqItem(entry, file) {
   const q = entry.q || entry.question;
   const a = entry.a || entry.answer;
   const id = entry.id || `${path.basename(file)}:${(q || '').slice(0, 64)}`;
   return {
-    id,
-    q,
-    a,
+    id, q, a,
     alt: Array.isArray(entry.alt) ? entry.alt : [],
     tags: Array.isArray(entry.tags) ? entry.tags : [],
-    source: file
+    _src: file
   };
 }
 
 function mergeMeta(into, from, file) {
   if (!from) return;
-
-  // firma/company
   const company = from.firma || from.company;
   if (company) into.company = { ...(into.company || {}), ...company, _source: file };
-
-  // tjenester/services
   const services = from.tjenester || from.services;
-  if (Array.isArray(services) && services.length) {
+  if (Array.isArray(services)) {
     into.services = [...(into.services || []), ...services.map(s => ({ ...s, _source: file }))];
   }
-
-  // priser/prices
   const prices = from.priser || from.prices;
   if (prices && typeof prices === 'object') {
     into.prices = { ...(into.prices || {}), ...prices, _source: file };
   }
-
-  // levering/delivery
   const delivery = from.levering || from.delivery;
   if (delivery) into.delivery = { ...(into.delivery || {}), ...delivery, _source: file };
 }
 
 function loadKnowledge() {
-  const baseDir = path.join(__dirname, '..', 'knowledge');
   const patterns = [
-    path.join(baseDir, '**/*.y?(a)ml'),
-    '!' + path.join(baseDir, '**/_*.y?(a)ml'),
-    '!' + path.join(baseDir, '**/draft-*.y?(a)ml')
+    path.join(KNOWLEDGE_DIR, '**/*.y?(a)ml'),
+    '!' + path.join(KNOWLEDGE_DIR, '**/_*.y?(a)ml'),
+    '!' + path.join(KNOWLEDGE_DIR, '**/draft-*.y?(a)ml'),
   ];
-  const files = fg.sync(patterns, { dot: false, onlyFiles: true });
-  files.sort((a, b) => a.localeCompare(b, 'en'));
+  const files = fg.sync(patterns, { dot: false, onlyFiles: true }).sort();
 
   const allFaq = [];
-  const byId = new Map();
+  const byId = new Set();
   const byKey = new Set();
-  const meta = {}; // company, services, prices, delivery
+  const meta = {};
 
   for (const file of files) {
-    let raw = '';
+    let raw;
     try {
       raw = fs.readFileSync(file, 'utf8');
     } catch (e) {
-      console.warn(`[Knowledge] Kunne ikke lese ${file}:`, e.message);
+      console.warn('[Knowledge] Kunne ikke lese', file, e.message);
       continue;
     }
-
     let doc;
     try {
       doc = YAML.load(raw, { filename: file }) || {};
     } catch (e) {
-      console.warn(`[Knowledge] YAML-feil i ${file}:`, e.message);
+      console.warn('[Knowledge] YAML-feil i', file, e.message);
       continue;
     }
 
     const parsed = KnowledgeDoc.safeParse(doc);
     if (!parsed.success) {
-      console.warn(`[Knowledge] Skjemafeil i ${file}:`, parsed.error.issues);
+      console.warn('[Knowledge] Skjemafeil i', file, parsed.error.issues);
       continue;
     }
 
-    // FAQ
     for (const entry of parsed.data.faq || []) {
       const item = normalizeFaqItem(entry, file);
-      const key = `${item.q}`.trim().toLowerCase();
+      const key = (item.q || '').trim().toLowerCase();
       if (byId.has(item.id) || byKey.has(key)) continue;
-      byId.set(item.id, true);
+      byId.add(item.id);
       byKey.add(key);
       allFaq.push(item);
     }
 
-    // META
     mergeMeta(meta, parsed.data, file);
   }
 
-  return {
-    faq: allFaq,
-    meta,
-    count: { faq: allFaq.length },
-    files
-  };
+  return { faq: allFaq, meta, faqIndex: { files }, count: { faq: allFaq.length } };
 }
 
 module.exports = { loadKnowledge };
