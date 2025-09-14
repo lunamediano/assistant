@@ -5,84 +5,55 @@ const { detectPriceIntent, handlePriceIntent } = require('./handlers/priceHandle
 const { fallbackHandler } = require('./handlers/fallbackHandler');
 const { loadKnowledge } = require('../data/loadData');
 
-// Slå på med DEBUG_ASSISTANT=1 (eller "true")
-const DEBUG = ['1', 'true'].includes(String(process.env.DEBUG_ASSISTANT || '').toLowerCase());
-
-// Enkel “safe log” som bare logger når DEBUG er aktiv
-function dlog(...args) {
-  if (DEBUG) console.log(...args);
-}
-
-// Litt hjelp for å følge ett kall
-function newReqId() {
-  // f.eks. "r-1725712345678-3f9"
-  const rnd = Math.random().toString(16).slice(2, 5);
-  return `r-${Date.now()}-${rnd}`;
-}
+const DEBUG = (process.env.DEBUG_ASSISTANT || '').toLowerCase() === '1';
 
 function createAssistant() {
-  // Last kunnskapen én gang per instans
-  const data = loadKnowledge();
-  dlog('[boot] knowledge loaded:', {
-    faqCount: Array.isArray(data.faq) ? data.faq.length : 0,
-    hasMeta: !!data.meta,
-  });
+  const data = loadKnowledge(); // last en gang
 
   return {
     async handle({ text }) {
-      const reqId = newReqId();
-      const t0 = Date.now();
-
       const input = typeof text === 'string' ? text : '';
       const lower = input.toLowerCase();
 
-      dlog(`[${reqId}] incoming`, {
-        len: input.length,
-        sample: input.slice(0, 120),
-      });
-
       try {
-        // 1) FAQ (fuzzy)
+        // 1) FAQ
         const faqMatch = detectFaq(lower, data.faq);
         if (faqMatch) {
-          dlog(
-            `[${reqId}] route=f aq`,
-            { matchId: faqMatch.id || null, q: faqMatch.q || null, source: faqMatch.source || faqMatch.src || null }
-          );
-          return handleFaq(faqMatch);
+          DEBUG && console.log('[route] faq ->', faqMatch.id || faqMatch.q);
+          const r = handleFaq(faqMatch);
+          if (r) return r;
         }
 
-        // 2) Firma / praktisk
+        // 2) Firma/praktisk
         const compIntent = detectCompanyIntent(lower);
         if (compIntent) {
-          dlog(`[${reqId}] route=company`, { intent: compIntent });
+          DEBUG && console.log('[route] company ->', compIntent);
           const r = handleCompanyIntent(compIntent, data.meta);
           if (r) return r;
         }
 
-        // 3) Pris / levering
+        // 3) Pris/levering
         const priceIntent = detectPriceIntent(lower);
         if (priceIntent) {
-          dlog(`[${reqId}] route=price`, { intent: priceIntent });
+          DEBUG && console.log('[route] price ->', priceIntent);
           const r = handlePriceIntent(priceIntent, data.meta);
           if (r) return r;
         }
 
         // 4) Fallback
-        dlog(`[${reqId}] route=fallback`);
+        DEBUG && console.log('[route] fallback');
         return fallbackHandler(input);
+
       } catch (err) {
-        console.error(`[${reqId}] [assistant] error:`, err);
+        console.error('[assistant] error:', err);
+        // NB: vi svarer kontrollert, ikke kaster:
         return {
           type: 'answer',
           text: 'Beklager, noe gikk galt på serveren. Prøv igjen om litt.',
-          error: String(err && err.message ? err.message : err),
+          error: String(err && err.message ? err.message : err)
         };
-      } finally {
-        const dt = Date.now() - t0;
-        dlog(`[${reqId}] done`, { ms: dt });
       }
-    },
+    }
   };
 }
 
