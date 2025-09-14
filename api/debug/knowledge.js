@@ -14,14 +14,16 @@ function applyCors(req, res) {
 }
 
 function tryLoadKnowledge() {
-  // Try both relative and absolute (Vercel bundle) paths
+  // Prøv relative og absolutte stier som brukes i Vercel-lambdaer
   const tries = [
-    // relative from /api/debug/*
+    // relative fra /api/debug/*
     '../../core/data/loadData',
     '../core/data/loadData',
     '../../data/loadData',
     '../data/loadData',
-    // absolute fallback in Vercel lambdas
+    // absolutte – vanlig plassering i Vercel bundle
+    '/var/task/api/data/loadData',
+    '/var/task/api/core/data/loadData',
     '/var/task/core/data/loadData',
     '/var/task/data/loadData',
   ];
@@ -29,11 +31,11 @@ function tryLoadKnowledge() {
   const errors = [];
   for (const p of tries) {
     try {
-      // eslint-disable-next-line import/no-dynamic-require, global-require
+      // eslint-disable-next-line global-require
       const { loadKnowledge } = require(p);
       return { loadKnowledge, pathTried: p };
     } catch (e) {
-      errors.push(`${p}: ${e && e.message ? e.message : e}`);
+      errors.push(`${p}: ${e?.message || e}`);
     }
   }
   const err = new Error('Fant ikke loadData i noen kjente stier');
@@ -76,7 +78,7 @@ module.exports = async (req, res) => {
   } catch (e) {
     res.status(200).json({
       ok: false,
-      error: String(e && e.message ? e.message : e),
+      error: String(e?.message || e),
       details: e?.details || null,
       stack: e?.stack ? String(e.stack).split('\n').slice(0, 6) : null,
     });
