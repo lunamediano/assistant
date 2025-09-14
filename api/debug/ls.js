@@ -30,7 +30,7 @@ module.exports = async (req, res) => {
   cors(req, res);
   if (req.method === 'OPTIONS') return res.status(204).end();
 
-  module.exports.config = {
+module.exports.config = {
   runtime: 'nodejs20.x',
   includeFiles: ['api/core/**','api/data/**','api/knowledge/**'],
 };
