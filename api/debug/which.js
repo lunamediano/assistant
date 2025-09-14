@@ -1,8 +1,6 @@
 // api/debug/which.js
-// Sjekker at core finnes og at createAssistant er tilgjengelig
-
 function tryRequireCore() {
-  const tries = ['../../core', '../core', '/var/task/core', '/var/task/api/core'];
+  const tries = ['../core', '/var/task/api/core']; // fra api/debug/* er ../core korrekt
   for (const p of tries) {
     try { return require(p); } catch {}
   }
@@ -20,7 +18,6 @@ module.exports = async (_req, res) => {
   });
 };
 
-// ...filinnholdet ditt...
 module.exports.config = {
   runtime: 'nodejs20.x',
   includeFiles: ['api/core/**','api/data/**','api/knowledge/**'],
