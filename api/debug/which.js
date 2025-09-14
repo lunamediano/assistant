@@ -20,8 +20,8 @@ module.exports = async (_req, res) => {
   });
 };
 
-// --- Per-funksjon konfig: pakk inn core/data/knowledge i lambdaen
+// ...filinnholdet ditt...
 module.exports.config = {
   runtime: 'nodejs20.x',
-  includeFiles: ['core/**', 'data/**', 'knowledge/**'],
+  includeFiles: ['api/core/**','api/data/**','api/knowledge/**'],
 };
