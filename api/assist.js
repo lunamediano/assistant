@@ -1,9 +1,17 @@
 // api/assist.js
+
+// --- Per-funksjon konfig: tving bundleren til å ta med core/data/knowledge ---
+module.exports.config = {
+  runtime: 'nodejs20.x',
+  includeFiles: ['core/**', 'data/**', 'knowledge/**']
+};
+
+// --- CORS whitelist (staging-domenet ditt) ---
 const ALLOWED_ORIGINS = [
   'https://h05693dfe8-staging.onrocket.site',
 ];
 
-// tving bundleren til å inkludere core i lambdaen
+// Liten “hint” til bundleren i tillegg (skader ikke)
 try { require('../core'); } catch {}
 
 function applyCors(req, res) {
@@ -18,16 +26,18 @@ function applyCors(req, res) {
 
 function parseBody(req) {
   let body = req.body;
-  if (typeof body === 'string') { try { body = JSON.parse(body); } catch {} }
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body); } catch {}
+  }
   return body || {};
 }
 
 function tryRequireCore() {
   const tries = [
-    '../core',               // api/* -> ../core
-    '../../core',            // api/debug/* -> ../../core
-    '/var/task/api/core',    // absolutt (vanlig i Vercel)
-    '/var/task/core',        // ev. alternativ absolutt
+    '../core',            // api/* -> ../core
+    '../../core',         // api/debug/* -> ../../core
+    '/var/task/core',     // absolutt sti i Vercel
+    '/var/task/api/core', // ev. alternativ absolutt
   ];
   for (const p of tries) {
     try { return require(p); } catch {}
@@ -39,7 +49,7 @@ function computeUseModular() {
   const mode = (process.env.ASSISTANT_MODE || '').toLowerCase();
   const flag = (process.env.USE_MODULAR_ASSISTANT || '').toLowerCase();
   if (mode === 'modular' || flag === '1' || flag === 'true') return true;
-  return !!tryRequireCore(); // auto-detekt
+  return !!tryRequireCore(); // auto når core faktisk er pakket inn
 }
 
 module.exports = async (req, res) => {
@@ -50,12 +60,10 @@ module.exports = async (req, res) => {
 
   try {
     const method = (req.method || 'GET').toUpperCase();
-    const fromQuery = (req.query && (req.query.text || req.query.message)) || '';
-    const fromBody = (() => {
-      const b = parseBody(req);
-      return (b.text || b.message || '');
-    })();
-    const text = method === 'GET' ? fromQuery : fromBody;
+    const q = (req.query && (req.query.text || req.query.message)) || '';
+    const b = parseBody(req);
+    const bodyText = b.text || b.message || '';
+    const text = method === 'GET' ? q : bodyText;
 
     if (useModular) {
       const core = tryRequireCore();
@@ -67,9 +75,15 @@ module.exports = async (req, res) => {
     }
 
     // Fallback (legacy)
-    return res.status(200).json({ type: 'answer', text: 'Legacy assist svar (fallback).' });
+    return res.status(200).json({
+      type: 'answer',
+      text: 'Legacy assist svar (fallback).'
+    });
   } catch (err) {
     console.error('API /api/assist feilet:', err);
-    return res.status(500).json({ error: 'Internal error', details: String(err?.message || err) });
+    return res.status(500).json({
+      error: 'Internal error',
+      details: String(err?.message || err)
+    });
   }
 };
