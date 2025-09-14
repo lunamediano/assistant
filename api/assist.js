@@ -1,9 +1,12 @@
 // api/assist.js
 
-// --- Per-funksjon konfig: tving bundleren til å ta med core/data/knowledge ---
 module.exports.config = {
   runtime: 'nodejs20.x',
-  includeFiles: ['core/**', 'data/**', 'knowledge/**']
+  includeFiles: [
+    'api/core/**',
+    'api/data/**',
+    'api/knowledge/**'  // ufarlig selv om du bruker variant 1
+  ]
 };
 
 // --- CORS whitelist (staging-domenet ditt) ---
