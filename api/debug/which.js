@@ -1,32 +1,27 @@
 // api/debug/which.js
-const ALLOWED_ORIGINS = [
-  'https://h05693dfe8-staging.onrocket.site',
-];
-function applyCors(req, res) {
-  const origin = req.headers.origin || '';
-  if (ALLOWED_ORIGINS.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Vary', 'Origin');
+// Sjekker at core finnes og at createAssistant er tilgjengelig
+
+function tryRequireCore() {
+  const tries = ['../../core', '../core', '/var/task/core', '/var/task/api/core'];
+  for (const p of tries) {
+    try { return require(p); } catch {}
   }
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  return null;
 }
 
-module.exports = async (req, res) => {
-  applyCors(req, res);
-  if (req.method === 'OPTIONS') return res.status(204).end();
+module.exports = async (_req, res) => {
+  const core = tryRequireCore();
+  const hasCreate = !!(core && typeof core.createAssistant === 'function');
+  res.status(200).json({
+    ok: true,
+    required: hasCreate ? ['createAssistant'] : [],
+    hasCreate,
+    error: hasCreate ? null : 'Fant ikke core eller createAssistant'
+  });
+};
 
-  let required = [];
-  let hasCreate = false;
-  let error = null;
-
-  try {
-    const core = require('../../core');
-    required = Object.keys(core);
-    hasCreate = typeof core.createAssistant === 'function';
-  } catch (e) {
-    error = String(e && e.message ? e.message : e);
-  }
-
-  res.status(200).json({ ok: true, required, hasCreate, error });
+// --- Per-funksjon konfig: pakk inn core/data/knowledge i lambdaen
+module.exports.config = {
+  runtime: 'nodejs20.x',
+  includeFiles: ['core/**', 'data/**', 'knowledge/**'],
 };
