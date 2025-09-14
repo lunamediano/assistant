@@ -5,7 +5,8 @@ const fg = require('fast-glob');
 const YAML = require('js-yaml');
 const { KnowledgeDoc } = require('./schema');
 
-const KNOWLEDGE_DIR = path.join(__dirname, 'knowledge'); // api/data/knowledge
+const KNOWLEDGE_DIR = path.join(__dirname, '..', 'knowledge'); // api/knowledge
+//
 
 function normalizeFaqItem(entry, file) {
   const q = entry.q || entry.question;
