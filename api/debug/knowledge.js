@@ -13,24 +13,45 @@ function applyCors(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
+function tryLoadKnowledge() {
+  const tries = [
+    '../../core/data/loadData', // api/debug/* -> ../../core
+    '../core/data/loadData',    // api/* -> ../core (i noen bygg)
+    '../../data/loadData',      // hvis data ligger på toppnivå
+    '../data/loadData',
+  ];
+  const errors = [];
+  for (const p of tries) {
+    try {
+      // eslint-disable-next-line import/no-dynamic-require, global-require
+      const { loadKnowledge } = require(p);
+      return { loadKnowledge, path: p };
+    } catch (e) {
+      errors.push(`${p}: ${e && e.message ? e.message : e}`);
+    }
+  }
+  const err = new Error('Fant ikke loadData i noen kjente stier');
+  err.details = errors;
+  throw err;
+}
+
 module.exports = async (req, res) => {
   applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(204).end();
 
   try {
-    // ✅ KORREKT sti i prod (core ligger på toppnivå)
-    const { loadKnowledge } = require('../../core/data/loadData');
-
+    const { loadKnowledge, path } = tryLoadKnowledge();
     const data = loadKnowledge();
+
     const faq = Array.isArray(data?.faq) ? data.faq : [];
     const meta = data?.meta || {};
     const company = meta.company || {};
     const prices = meta.prices || {};
     const delivery = meta.delivery || {};
 
-    res.status(200).json({
+    return res.status(200).json({
       ok: true,
-      files: faq.length,
+      loaderPath: path,
       faqCount: faq.length,
       sample: faq.slice(0, 5).map(x => ({
         id: x.id || null,
@@ -47,9 +68,10 @@ module.exports = async (req, res) => {
       },
     });
   } catch (e) {
-    res.status(200).json({
+    return res.status(200).json({
       ok: false,
       error: String(e && e.message ? e.message : e),
+      details: e?.details || null,
       stack: e?.stack ? String(e.stack).split('\n').slice(0, 6) : null,
     });
   }
