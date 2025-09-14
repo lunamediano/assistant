@@ -1,9 +1,9 @@
 // api/debug/knowledge.js
-const { loadKnowledge } = require('../../core/data/loadData');
-
+// NB: ikke require() core på toppnivå – gjør det inne i try slik at vi kan fange feil
 const ALLOWED_ORIGINS = [
   'https://h05693dfe8-staging.onrocket.site',
 ];
+
 function applyCors(req, res) {
   const origin = req.headers.origin || '';
   if (ALLOWED_ORIGINS.includes(origin)) {
@@ -19,17 +19,17 @@ module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(204).end();
 
   try {
-    // Try to fully load the KB via the same code the assistant uses
-    const data = loadKnowledge();
+    // KORREKT sti fra /api/debug/ -> /core/data/loadData.js
+    const { loadKnowledge } = require('../core/data/loadData');
 
-    // Summarize safely
+    const data = loadKnowledge();
     const faq = Array.isArray(data?.faq) ? data.faq : [];
     const meta = data?.meta || {};
     const company = meta?.company || {};
     const prices = meta?.prices || {};
     const delivery = meta?.delivery || {};
 
-    res.status(200).json({
+    return res.status(200).json({
       ok: true,
       files: faq.length,
       faqCount: faq.length,
@@ -48,11 +48,11 @@ module.exports = async (req, res) => {
       }
     });
   } catch (e) {
-    // Never crash: return diagnostics so we can see what went wrong
-    res.status(200).json({
+    // Aldri 500 – gi tydelig diagnostikk
+    return res.status(200).json({
       ok: false,
       error: String(e && e.message ? e.message : e),
-      stack: (e && e.stack) ? String(e.stack).split('\n').slice(0, 5) : null
+      stack: (e && e.stack) ? String(e.stack).split('\n').slice(0, 6) : null
     });
   }
 };
