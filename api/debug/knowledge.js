@@ -1,5 +1,5 @@
 // api/debug/knowledge.js
-const { loadKnowledge } = require('../../data/loadData');
+const { loadKnowledge } = require('../../core/data/loadData');
 
 const ALLOWED_ORIGINS = [
   'https://h05693dfe8-staging.onrocket.site',
@@ -18,11 +18,41 @@ module.exports = async (req, res) => {
   applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(204).end();
 
-  const data = loadKnowledge();
-  res.status(200).json({
-    ok: true,
-    files: data.sources.length,
-    faqCount: data.faq.length,
-    sample: data.faq.slice(0, 5),
-  });
+  try {
+    // Try to fully load the KB via the same code the assistant uses
+    const data = loadKnowledge();
+
+    // Summarize safely
+    const faq = Array.isArray(data?.faq) ? data.faq : [];
+    const meta = data?.meta || {};
+    const company = meta?.company || {};
+    const prices = meta?.prices || {};
+    const delivery = meta?.delivery || {};
+
+    res.status(200).json({
+      ok: true,
+      files: faq.length,
+      faqCount: faq.length,
+      sample: faq.slice(0, 5).map(x => ({
+        id: x.id || null,
+        q: x.q || null,
+        src: x._source || null
+      })),
+      metaSummary: {
+        hasCompany: !!company?.navn,
+        hasPrices: Object.keys(prices).length > 0,
+        hasDelivery: Object.keys(delivery).length > 0,
+        sourceCompany: company?._source || null,
+        sourcePrices: prices?._source || null,
+        sourceDelivery: delivery?._source || null
+      }
+    });
+  } catch (e) {
+    // Never crash: return diagnostics so we can see what went wrong
+    res.status(200).json({
+      ok: false,
+      error: String(e && e.message ? e.message : e),
+      stack: (e && e.stack) ? String(e.stack).split('\n').slice(0, 5) : null
+    });
+  }
 };
