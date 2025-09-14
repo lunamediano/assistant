@@ -15,35 +15,28 @@ function applyCors(req, res) {
 
 function parseBody(req) {
   let body = req.body;
-  if (typeof body === 'string') {
-    try { body = JSON.parse(body); } catch { /* ignore */ }
-  }
+  if (typeof body === 'string') { try { body = JSON.parse(body); } catch {} }
   return body || {};
+}
+
+function tryRequireCore() {
+  const tries = [
+    '../core',               // api/* -> ../core
+    '../../core',            // api/debug/* -> ../../core
+    '/var/task/api/core',    // absolutt (vanlig i Vercel)
+    '/var/task/core',        // ev. alternativ absolutt
+  ];
+  for (const p of tries) {
+    try { return require(p); } catch {}
+  }
+  return null;
 }
 
 function computeUseModular() {
   const mode = (process.env.ASSISTANT_MODE || '').toLowerCase();
   const flag = (process.env.USE_MODULAR_ASSISTANT || '').toLowerCase();
-  const byEnv = mode === 'modular' || flag === '1' || flag === 'true';
-  if (byEnv) return true;
-
-  // Auto-detect: if we can require core by any path, use it.
-  return !!tryRequireCore();
-}
-
-function tryRequireCore() {
-  const tries = [
-    '../core',            // api/* -> ../core
-    '../../core',         // api/debug/* -> ../../core
-    '/var/task/core',     // absolute in Vercel bundle
-  ];
-  for (const p of tries) {
-    try {
-      // eslint-disable-next-line global-require
-      return require(p);
-    } catch {}
-  }
-  return null;
+  if (mode === 'modular' || flag === '1' || flag === 'true') return true;
+  return !!tryRequireCore(); // auto-detekt
 }
 
 module.exports = async (req, res) => {
@@ -70,16 +63,10 @@ module.exports = async (req, res) => {
       }
     }
 
-    // Legacy fallback
-    return res.status(200).json({
-      type: 'answer',
-      text: 'Legacy assist svar (fallback).'
-    });
+    // Fallback (legacy)
+    return res.status(200).json({ type: 'answer', text: 'Legacy assist svar (fallback).' });
   } catch (err) {
     console.error('API /api/assist feilet:', err);
-    return res.status(500).json({
-      error: 'Internal error',
-      details: String(err && err.message ? err.message : err)
-    });
+    return res.status(500).json({ error: 'Internal error', details: String(err?.message || err) });
   }
 };
