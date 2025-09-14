@@ -1,21 +1,19 @@
 // api/assist.js
 
+// --- Vercel bundler-hint: ta med core, data, knowledge ---
 module.exports.config = {
   runtime: 'nodejs20.x',
   includeFiles: [
     'api/core/**',
     'api/data/**',
-    'api/knowledge/**'  // ufarlig selv om du bruker variant 1
+    'api/knowledge/**' // ufarlig selv om knowledge ligger under data/
   ]
 };
 
-// --- CORS whitelist (staging-domenet ditt) ---
+// --- CORS whitelist (legg evt. til flere domener ved behov) ---
 const ALLOWED_ORIGINS = [
   'https://h05693dfe8-staging.onrocket.site',
 ];
-
-// Liten “hint” til bundleren i tillegg (skader ikke)
-try { require('../core'); } catch {}
 
 function applyCors(req, res) {
   const origin = req.headers.origin || '';
@@ -27,6 +25,7 @@ function applyCors(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
+// --- Hjelpefunksjon: parse body ---
 function parseBody(req) {
   let body = req.body;
   if (typeof body === 'string') {
@@ -35,12 +34,12 @@ function parseBody(req) {
   return body || {};
 }
 
+// --- Hjelpefunksjon: prøv å require core ---
 function tryRequireCore() {
   const tries = [
-    '../core',            // api/* -> ../core
-    '../../core',         // api/debug/* -> ../../core
-    '/var/task/core',     // absolutt sti i Vercel
-    '/var/task/api/core', // ev. alternativ absolutt
+    '../core',             // api/* -> ../core
+    '/var/task/api/core',  // absolutt Vercel-sti
+    '/var/task/core',      // fallback
   ];
   for (const p of tries) {
     try { return require(p); } catch {}
@@ -48,13 +47,15 @@ function tryRequireCore() {
   return null;
 }
 
+// --- Bestem om vi skal bruke modulær assistent ---
 function computeUseModular() {
   const mode = (process.env.ASSISTANT_MODE || '').toLowerCase();
   const flag = (process.env.USE_MODULAR_ASSISTANT || '').toLowerCase();
   if (mode === 'modular' || flag === '1' || flag === 'true') return true;
-  return !!tryRequireCore(); // auto når core faktisk er pakket inn
+  return !!tryRequireCore(); // fallback: aktiver hvis core faktisk finnes
 }
 
+// --- Selve handleren ---
 module.exports = async (req, res) => {
   applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -63,10 +64,10 @@ module.exports = async (req, res) => {
 
   try {
     const method = (req.method || 'GET').toUpperCase();
-    const q = (req.query && (req.query.text || req.query.message)) || '';
-    const b = parseBody(req);
-    const bodyText = b.text || b.message || '';
-    const text = method === 'GET' ? q : bodyText;
+    const fromQuery = (req.query && (req.query.text || req.query.message)) || '';
+    const body = parseBody(req);
+    const fromBody = body.text || body.message || '';
+    const text = method === 'GET' ? fromQuery : fromBody;
 
     if (useModular) {
       const core = tryRequireCore();
@@ -77,7 +78,7 @@ module.exports = async (req, res) => {
       }
     }
 
-    // Fallback (legacy)
+    // --- Fallback (legacy) ---
     return res.status(200).json({
       type: 'answer',
       text: 'Legacy assist svar (fallback).'
