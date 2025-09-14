@@ -13,54 +13,73 @@ function applyCors(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
+function computeUseModular() {
+  const mode = (process.env.ASSISTANT_MODE || '').toLowerCase();
+  const flag = (process.env.USE_MODULAR_ASSISTANT || '').toLowerCase();
+  const byEnv = mode === 'modular' || flag === '1' || flag === 'true';
+  if (byEnv) return true;
+
+  // Auto-detect: hvis vi klarer å require('../core'), bruk den.
+  try {
+    // eslint-disable-next-line global-require
+    require('../core');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function parseBody(req) {
+  let body = req.body;
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body); } catch { /* ignore */ }
+  }
+  return body || {};
+}
+
 module.exports = async (req, res) => {
-  // --- CORS + preflight ---
   applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(204).end();
 
-  // Tillat både "1" og "true"
-  const flag = (process.env.USE_MODULAR_ASSISTANT || '').toLowerCase();
-  const useModular = flag === '1' || flag === 'true';
+  const useModular = computeUseModular();
 
   try {
-    // --- Hent tekst fra GET eller POST (tåler body som string/JSON) ---
+    // Hent tekst fra GET/POST
     const method = (req.method || 'GET').toUpperCase();
-
-    let body = req.body;
-    if (typeof body === 'string') {
-      try { body = JSON.parse(body); } catch { /* ignorér */ }
-    }
-
     const fromQuery =
       (req.query && (req.query.text || req.query.message)) || '';
-
-    const fromBody =
-      (body && (body.text || body.message)) || '';
-
+    const fromBody = (() => {
+      const b = parseBody(req);
+      return (b.text || b.message || '');
+    })();
     const text = method === 'GET' ? fromQuery : fromBody;
 
-    // --- Bruk modulær kjerne hvis flagget er på ---
     if (useModular) {
-      let modular = null;
+      let core = null;
       try {
-        modular = require('../core'); // kjernen vår
-      } catch (e) {
-        console.error('Kunne ikke require("../core"):', e);
+        // eslint-disable-next-line global-require
+        core = require('../core');         // api/* -> ../core
+      } catch {
+        try {
+          // eslint-disable-next-line global-require
+          core = require('../../core');    // api/debug/* -> ../../core (fallback)
+        } catch (e) {
+          console.error('Kunne ikke require core:', e);
+        }
       }
 
-      if (modular && typeof modular.createAssistant === 'function') {
-        const assistant = modular.createAssistant();
+      if (core && typeof core.createAssistant === 'function') {
+        const assistant = core.createAssistant();
         const reply = await assistant.handle({ text: String(text || '') });
         return res.status(200).json(reply);
       }
     }
 
-    // --- Fallback (legacy) ---
+    // Fallback (legacy)
     return res.status(200).json({
       type: 'answer',
       text: 'Legacy assist svar (fallback).'
     });
-
   } catch (err) {
     console.error('API /api/assist feilet:', err);
     return res.status(500).json({
