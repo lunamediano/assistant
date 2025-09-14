@@ -13,28 +13,37 @@ function applyCors(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
-function computeUseModular() {
-  const mode = (process.env.ASSISTANT_MODE || '').toLowerCase();
-  const flag = (process.env.USE_MODULAR_ASSISTANT || '').toLowerCase();
-  const byEnv = mode === 'modular' || flag === '1' || flag === 'true';
-  if (byEnv) return true;
-
-  // Auto-detect: hvis vi klarer å require('../core'), bruk den.
-  try {
-    // eslint-disable-next-line global-require
-    require('../core');
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 function parseBody(req) {
   let body = req.body;
   if (typeof body === 'string') {
     try { body = JSON.parse(body); } catch { /* ignore */ }
   }
   return body || {};
+}
+
+function computeUseModular() {
+  const mode = (process.env.ASSISTANT_MODE || '').toLowerCase();
+  const flag = (process.env.USE_MODULAR_ASSISTANT || '').toLowerCase();
+  const byEnv = mode === 'modular' || flag === '1' || flag === 'true';
+  if (byEnv) return true;
+
+  // Auto-detect: if we can require core by any path, use it.
+  return !!tryRequireCore();
+}
+
+function tryRequireCore() {
+  const tries = [
+    '../core',            // api/* -> ../core
+    '../../core',         // api/debug/* -> ../../core
+    '/var/task/core',     // absolute in Vercel bundle
+  ];
+  for (const p of tries) {
+    try {
+      // eslint-disable-next-line global-require
+      return require(p);
+    } catch {}
+  }
+  return null;
 }
 
 module.exports = async (req, res) => {
@@ -44,10 +53,8 @@ module.exports = async (req, res) => {
   const useModular = computeUseModular();
 
   try {
-    // Hent tekst fra GET/POST
     const method = (req.method || 'GET').toUpperCase();
-    const fromQuery =
-      (req.query && (req.query.text || req.query.message)) || '';
+    const fromQuery = (req.query && (req.query.text || req.query.message)) || '';
     const fromBody = (() => {
       const b = parseBody(req);
       return (b.text || b.message || '');
@@ -55,19 +62,7 @@ module.exports = async (req, res) => {
     const text = method === 'GET' ? fromQuery : fromBody;
 
     if (useModular) {
-      let core = null;
-      try {
-        // eslint-disable-next-line global-require
-        core = require('../core');         // api/* -> ../core
-      } catch {
-        try {
-          // eslint-disable-next-line global-require
-          core = require('../../core');    // api/debug/* -> ../../core (fallback)
-        } catch (e) {
-          console.error('Kunne ikke require core:', e);
-        }
-      }
-
+      const core = tryRequireCore();
       if (core && typeof core.createAssistant === 'function') {
         const assistant = core.createAssistant();
         const reply = await assistant.handle({ text: String(text || '') });
@@ -75,7 +70,7 @@ module.exports = async (req, res) => {
       }
     }
 
-    // Fallback (legacy)
+    // Legacy fallback
     return res.status(200).json({
       type: 'answer',
       text: 'Legacy assist svar (fallback).'
