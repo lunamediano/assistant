@@ -7,7 +7,7 @@ Dette repoet inneholder:
 - `/prompt/system_prompt.md` – rolle og tone for assistenten.
 
 ## Kom i gang (Vercel)
-1. Koble repoet til Vercel og deploy.
+1. Koble repoet til Vercel og deploy...
 2. Legg til Environment Variables:
    - `LUNA_ALLOWED_ORIGINS` = `https://lunamedia.no` (eller staging-URL ved test)
    - (Valgfritt) `OPENAI_API_KEY` for ekte LLM-svar senere
