@@ -1,5 +1,7 @@
 // api/assist.js
 
+// i tryRequireCore: prøv '../core' og '/var/task/core'
+
 // --- Vercel bundler-hint: ta med core, data, knowledge ---
 module.exports.config = {
   runtime: 'nodejs20.x',
