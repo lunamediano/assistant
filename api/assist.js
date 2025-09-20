@@ -2,14 +2,9 @@
 
 // i tryRequireCore: prøv '../core' og '/var/task/core'
 
-// --- Vercel bundler-hint: ta med core, data, knowledge ---
 module.exports.config = {
   runtime: 'nodejs20.x',
-  includeFiles: [
-    'api/core/**',
-    'api/data/**',
-    'api/knowledge/**' // ufarlig selv om knowledge ligger under data/
-  ]
+  includeFiles: ['core/**','data/**','knowledge/**']
 };
 
 // --- CORS whitelist (legg evt. til flere domener ved behov) ---
