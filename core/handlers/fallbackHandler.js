@@ -1,4 +1,6 @@
 // core/handlers/fallbackHandler.js
+const { loadKnowledge } = require('../data/loadData');
+
 function fallbackHandler(input) {
   const polite =
     'Jeg er ikke helt sikker – men jeg kan sjekke kunnskapsbasen nærmere om du spesifiserer hva du lurer på.';
