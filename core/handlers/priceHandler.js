@@ -1,4 +1,6 @@
 // core/handlers/priceHandler.js
+const { loadKnowledge } = require('../data/loadData');
+
 function safeNorm(s) {
   try {
     return (s || '')
