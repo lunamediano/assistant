@@ -1,5 +1,5 @@
 // core/handlers/companyHandler.js
-const { loadKnowledge } = require('../data/loadData'); // not strictly needed here if already loaded in core
+const { loadKnowledge } = require('../data/loadData');
 
 function norm(s) {
   return (s || '')
