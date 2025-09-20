@@ -4,7 +4,7 @@
 
 module.exports.config = {
   runtime: 'nodejs20.x',
-  includeFiles: ['core/**','data/**','knowledge/**']
+  includeFiles: ['core/**','data/**','knowledge/**'],
 };
 
 // --- CORS whitelist (legg evt. til flere domener ved behov) ---
