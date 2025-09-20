@@ -1,13 +1,14 @@
 {
   "version": 2,
+  "builds": [
+    { "src": "api/*.js", "use": "@vercel/node" }
+  ],
   "functions": {
     "api/assist.js": {
-      "runtime": "nodejs20.x",
       "includeFiles": "{core,data,knowledge}/**"
     },
     "api/debug.js": {
-      "runtime": "nodejs20.x",
       "includeFiles": "{core,data,knowledge}/**"
     }
-  }
+  ]
 }
