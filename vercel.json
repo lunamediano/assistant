@@ -10,6 +10,5 @@
     "api/debug.js": {
       "includeFiles": "{core,data,knowledge}/**"
     }
-  ]
+  }
 }
-  
