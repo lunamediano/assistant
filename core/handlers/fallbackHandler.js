@@ -1,5 +1,5 @@
 // core/handlers/fallbackHandler.js
-const { loadKnowledge } = require('../data/loadData');
+const { loadKnowledge } = require('../../data/loadData');
 
 function fallbackHandler(input) {
   const polite =
