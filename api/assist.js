@@ -2,11 +2,6 @@
 
 // i tryRequireCore: prøv '../core' og '/var/task/core'
 
-module.exports.config = {
-  runtime: 'nodejs20.x',
-  includeFiles: ['core/**','data/**','knowledge/**'],
-};
-
 // --- CORS whitelist (legg evt. til flere domener ved behov) ---
 const ALLOWED_ORIGINS = [
   'https://h05693dfe8-staging.onrocket.site',
