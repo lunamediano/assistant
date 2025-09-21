@@ -1,4 +1,4 @@
-// api/ping.js
-module.exports = async (req, res) => {
-  res.status(200).json({ ok: true, ts: Date.now() });
-};
+// /api/ping.js
+export default function handler(req,res){
+  return res.status(200).json({ ok:true, now: Date.now() });
+}
