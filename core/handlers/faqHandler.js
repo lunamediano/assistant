@@ -1,6 +1,6 @@
 // core/handlers/faqHandler.js
 
-const { loadKnowledge } = require('../data/loadData');
+const { loadKnowledge } = require('../../data/loadData');
 
 function normalize(s) {
   return (s || '')
