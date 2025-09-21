@@ -2,12 +2,6 @@
 const fs = require('fs');
 const path = require('path');
 
-// ---- Vercel bundle-hint: pakk med kjernen og kunnskapen ----
-module.exports.config = {
-  runtime: 'nodejs20.x',
-  includeFiles: ['core/**','data/**','knowledge/**'],
-};
-
 // ---- CORS (legg til flere domener ved behov) ----
 const ALLOWED_ORIGINS = ['https://h05693dfe8-staging.onrocket.site'];
 function cors(req, res) {
