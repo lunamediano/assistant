@@ -1,12 +1,13 @@
 {
   "version": 2,
-  "builds": [
-    { "src": "api/**/*.js", "use": "@vercel/node@3.0.24" }
-  ],
   "functions": {
     "api/*.js": {
       "runtime": "nodejs20.x",
-      "includeFiles": "{core,data,knowledge}/**"
+      "includeFiles": [
+        "core/**",
+        "data/**",
+        "knowledge/**"
+      ]
     }
   },
   "routes": [
