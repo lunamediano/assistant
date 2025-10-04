@@ -1,4 +1,5 @@
 // core/index.js
+const path = require('path');
 const { detectFaq, handleFaq } = require('./handlers/faqHandler');
 const { detectCompanyIntent, handleCompanyIntent } = require('./handlers/companyHandler');
 const { detectPriceIntent, handlePriceIntent } = require('./handlers/priceHandler');
@@ -7,7 +8,30 @@ const { detectPriceIntent, handlePriceIntent } = require('./handlers/priceHandle
 const fb = require('./handlers/fallbackHandler');
 const fallbackHandler = fb.fallbackHandler || fb.default || fb;
 
-const { loadKnowledge } = require('../data/loadData');
+function resolveLoadKnowledge() {
+  const guesses = [
+    path.join(__dirname, '..', 'data', 'loadData.js'),
+    path.join(process.cwd(), 'data', 'loadData.js'),
+    '/var/task/data/loadData.js',
+  ];
+
+  let lastError = null;
+  for (const candidate of guesses) {
+    try {
+      const mod = require(candidate);
+      if (mod && typeof mod.loadKnowledge === 'function') {
+        return mod.loadKnowledge;
+      }
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  const detail = lastError && lastError.message ? ` (${lastError.message})` : '';
+  throw new Error(`Kunne ikke laste data/loadData.js${detail}`);
+}
+
+const loadKnowledge = resolveLoadKnowledge();
 
 const DEBUG = (process.env.DEBUG_ASSISTANT || '').toLowerCase() === '1';
 
@@ -47,17 +71,16 @@ function createAssistant() {
         // 4) Fallback
         DEBUG && console.log('[route] fallback');
         return fallbackHandler(input);
-
       } catch (err) {
         console.error('[assistant] error:', err);
         // NB: vi svarer kontrollert, ikke kaster:
         return {
           type: 'answer',
           text: 'Beklager, noe gikk galt på serveren. Prøv igjen om litt.',
-          error: String(err && err.message ? err.message : err)
+          error: String(err && err.message ? err.message : err),
         };
       }
-    }
+    },
   };
 }
 
