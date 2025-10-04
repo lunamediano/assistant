@@ -70,6 +70,18 @@ module.exports = async (req, res) => {
       }
     }
 
+    const userText = String(text || '');
+    const normalized = userText.trim().toLowerCase();
+
+    if (normalized) {
+      if (/(^|\b)(hei|hallo|hello)(\b|!|\?)/.test(normalized)) {
+        return res.status(200).json({
+          type: 'answer',
+          text: 'Hei! Hyggelig å møte deg. Hvordan kan jeg hjelpe deg i dag?'
+        });
+      }
+    }
+
     // --- Fallback (legacy) ---
     return res.status(200).json({
       type: 'answer',
