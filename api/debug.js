@@ -3,7 +3,11 @@ const fs = require('fs');
 const path = require('path');
 
 // ---- CORS (legg til flere domener ved behov) ----
-const ALLOWED_ORIGINS = ['https://h05693dfe8-staging.onrocket.site'];
+const ALLOWED_ORIGINS = [
+  'https://h05693dfe8-staging.onrocket.site',
+  'https://assistant-c0bue1fkd-erik-hesby-johnsens-projects.vercel.app',
+  'https://assistant-git-main-erik-hesby-johnsens-projects.vercel.app'
+];
 function cors(req, res) {
   const o = req.headers.origin || '';
   if (ALLOWED_ORIGINS.includes(o)) {
@@ -135,4 +139,9 @@ module.exports = async (req, res) => {
   }catch(err){
     res.status(500).json({ ok:false, error: String(err?.message || err) });
   }
+};
+
+module.exports.config = {
+  runtime: 'nodejs20.x',
+  includeFiles: ['core/', 'data/', 'knowledge/**']
 };
