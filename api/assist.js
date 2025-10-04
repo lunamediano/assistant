@@ -5,6 +5,8 @@
 // --- CORS whitelist (legg evt. til flere domener ved behov) ---
 const ALLOWED_ORIGINS = [
   'https://h05693dfe8-staging.onrocket.site',
+  'https://assistant-c0bue1fkd-erik-hesby-johnsens-projects.vercel.app',
+  'https://assistant-git-main-erik-hesby-johnsens-projects.vercel.app'
 ];
 
 function applyCors(req, res) {
@@ -29,9 +31,8 @@ function parseBody(req) {
 // --- Hjelpefunksjon: prøv å require core ---
 function tryRequireCore() {
   const tries = [
-    '../core',             // api/* -> ../core
-    '/var/task/api/core',  // absolutt Vercel-sti
-    '/var/task/core',      // fallback
+    '../core',
+    '/var/task/core'
   ];
   for (const p of tries) {
     try { return require(p); } catch {}
@@ -82,4 +83,9 @@ module.exports = async (req, res) => {
       details: String(err?.message || err)
     });
   }
+};
+
+module.exports.config = {
+  runtime: 'nodejs20.x',
+  includeFiles: ['core/', 'data/', 'knowledge/**']
 };
