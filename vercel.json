@@ -1,15 +1,14 @@
 {
   "version": 2,
   "builds": [
-    { "src": "api/**/*.js", "use": "@vercel/node@3.0.24" }
+    { "src": "api/*.js", "use": "@vercel/node" }
   ],
   "functions": {
-    "api/*.js": {
-      "runtime": "nodejs20.x",
+    "api/assist.js": {
+      "includeFiles": "{core,data,knowledge}/**"
+    },
+    "api/debug.js": {
       "includeFiles": "{core,data,knowledge}/**"
     }
-  },
-  "routes": [
-    { "src": "/api/(.*)", "dest": "/api/$1" }
-  ]
+  }
 }
