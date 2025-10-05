@@ -1,14 +1,3 @@
 {
-  "version": 2,
-  "builds": [
-    { "src": "api/*.js", "use": "@vercel/node" }
-  ],
-  "functions": {
-    "api/assist.js": {
-      "includeFiles": "{core,data,knowledge}/**"
-    },
-    "api/debug.js": {
-      "includeFiles": "{core,data,knowledge}/**"
-    }
-  }
+  "version": 2
 }
