@@ -1,13 +1,6 @@
 {
-  "version": 2,
   "functions": {
-    "api/assist.js": {
-      "runtime": "nodejs20",
-      "includeFiles": "core/** data/** knowledge/**"
-    },
-    "api/debug.js": {
-      "runtime": "nodejs20",
-      "includeFiles": "core/** data/** knowledge/**"
-    }
+    "api/**/*.[jt]s": { "runtime": "nodejs20.x" }
   }
 }
+
