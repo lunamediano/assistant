@@ -120,4 +120,18 @@ faq:
     Ja. Vi kan skjøte røket bånd og/eller flytte innholdet over i nytt kassetthus før digitalisering.
     Enkle reparasjoner gjør vi som del av oppdraget – større arbeid avtales på forhånd.
   tags: ["vhs","video","reparasjon","tjenester"]
+
+  - id: vhs-formater-utvidet
+  q: "Tar dere også Betamax og andre formater?"
+  alt:
+    - "betamax digitalisering"
+    - "digitalisere betamax"
+    - "v2000 format"
+    - "s-vhs digitalisering"
+    - "andre videobånd formater"
+  a: |
+    Vi tar de vanligste formatene (VHS/VHS-C, Video8/Hi8, MiniDV m.fl.). Betamax og enkelte spesialformater kan vi løse etter vurdering.
+    Send gjerne utfyllende info til kontakt@lunamedia.no – og legg gjerne ved bilde av kassetten.
+  tags: ["vhs","formater","praktisk"]
+
   
