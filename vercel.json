@@ -11,4 +11,4 @@
       "includeFiles": "{core,data,knowledge,prompt}/**"
     }
   }
-}.
+}
