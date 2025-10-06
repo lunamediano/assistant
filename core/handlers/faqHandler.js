@@ -23,13 +23,17 @@ function jaccard(a, b) {
   return uni === 0 ? 0 : inter / uni;
 }
 
-// Finn beste match i faq-lista (bruker q + alt)
-function detectFaq(userText, faqList) {
+/**
+ * Finn beste match (med top-K trace)
+ * @returns {null | { item, score, candidates:[{id,q,score,src}] }}
+ */
+function detectFaq(userText, faqList, opts = {}) {
   if (!userText || !Array.isArray(faqList) || faqList.length === 0) return null;
 
+  const minScore = typeof opts.minScore === 'number' ? opts.minScore : 0.50; // skjerpet terskel
   const qn = normalize(userText);
-  let bestItem = null;
-  let bestScore = 0;
+
+  const scored = [];
 
   for (const item of faqList) {
     const baseQ = item.q || '';
@@ -37,37 +41,54 @@ function detectFaq(userText, faqList) {
 
     let altScore = 0;
     for (const alt of item.alt || []) {
-      altScore = Math.max(altScore, jaccard(qn, alt));
-      // Litt ekstra hvis “inneholder”
-      if (normalize(alt).includes(qn) || qn.includes(normalize(alt))) {
-        altScore = Math.max(altScore, 0.75);
-      }
+      let score = jaccard(qn, alt);
+      // lite bonus ved "inneholder"
+      const an = normalize(alt);
+      if (an.includes(qn) || qn.includes(an)) score = Math.max(score, 0.75);
+      if (score > altScore) altScore = score;
     }
 
-    // Bonus dersom hele spørsmålet er inneholdt
     const containsBonus =
       normalize(baseQ).includes(qn) || qn.includes(normalize(baseQ)) ? 0.15 : 0;
 
     const score = Math.max(baseScore + containsBonus, altScore);
 
-    if (score > bestScore) {
-      bestScore = score;
-      bestItem = item;
-    }
+    scored.push({
+      item,
+      score,
+      id: item.id,
+      q: item.q,
+      src: item._src || item.source || item.src
+    });
   }
 
-  // terskel for “god nok” match
-  return bestScore >= 0.40 ? bestItem : null;
+  scored.sort((a, b) => b.score - a.score);
+  const best = scored[0];
+
+  if (!best || best.score < minScore) return null;
+
+  return {
+    item: best.item,
+    score: best.score,
+    candidates: scored.slice(0, 3).map(x => ({
+      id: x.id, q: x.q, score: +x.score.toFixed(3), src: x.src
+    }))
+  };
 }
 
-function handleFaq(item) {
+function handleFaq(matchOrItem) {
+  const item = matchOrItem?.item || matchOrItem;
+  const score = typeof matchOrItem?.score === 'number' ? matchOrItem.score : undefined;
+  const candidates = Array.isArray(matchOrItem?.candidates) ? matchOrItem.candidates : undefined;
+
   return {
     type: 'answer',
     text: (item.a || '').endsWith('\n') ? item.a : (item.a || '') + '\n',
     meta: {
       matched_question: item.q,
-      source: item._source || item.source || item.src,
-      related: (item.related || []).slice(0, 3)
+      source: item._src || item.source || item.src,
+      score: typeof score === 'number' ? +score.toFixed(3) : undefined,
+      candidates // beholdes i API bare når trace=1 (se /api/assist.js)
     }
   };
 }
