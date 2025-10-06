@@ -1,4 +1,6 @@
-// /api/assist.js  (CommonJS – health, debug og chat i én lambda...)
+// build-bump: 2025-10-06T10:27Z
+
+// /api/assist.js  (CommonJS – health, debug og chat i én lambda)
 
 const { createAssistant } = require('../core');
 const { loadKnowledge }   = require('../data/loadData');
