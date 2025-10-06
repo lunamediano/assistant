@@ -2,7 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 
-// ---- CORS (legg til flere domener ved behov) ----
+// ---- CORS ----
 const ALLOWED_ORIGINS = ['https://h05693dfe8-staging.onrocket.site'];
 function cors(req, res) {
   const o = req.headers.origin || '';
@@ -15,22 +15,11 @@ function cors(req, res) {
 }
 function ok204(req, res){ if (req.method === 'OPTIONS') { res.status(204).end(); return true; } return false; }
 
-// ---- helpers for requires ----
-function tryRequireCore() {
-  const tries = ['../core','/var/task/core'];
-  for (const p of tries) { try { return require(p); } catch {} }
-  return null;
-}
-function tryLoadKnowledgeFn() {
-  const tries = ['../data/loadData','/var/task/data/loadData'];
-  for (const p of tries) {
-    try {
-      const m = require(p);
-      if (m && typeof m.loadKnowledge === 'function') return m.loadKnowledge;
-    } catch {}
-  }
-  return null;
-}
+// ---- static requires (for Vercel tracing) ----
+let core = null;
+let loadKnowledge = null;
+try { core = require('../core'); } catch {}
+try { loadKnowledge = require('../data/loadData').loadKnowledge; } catch {}
 
 // ---- sub-ops ----
 async function op_env() {
@@ -49,28 +38,7 @@ async function op_mode() {
 }
 async function op_ping(){ return { ok:true, now: Date.now() }; }
 
-async function op_ls(q) {
-  const roots = ['/var/task','/var/task/core','/var/task/data','/var/task/knowledge','/var/task/api'];
-  const pattern = String(q.pattern || '').toLowerCase() || null;
-  async function walk(root, out=[], depth=0, maxDepth=6){
-    try{
-      const ents = await fs.promises.readdir(root, { withFileTypes:true });
-      for(const e of ents){
-        const p = path.join(root, e.name);
-        const rel = p.replace('/var/task','');
-        if(!pattern || rel.toLowerCase().includes(pattern)) out.push(rel || '/');
-        if(e.isDirectory() && depth<maxDepth) await walk(p, out, depth+1, maxDepth);
-      }
-    }catch(_){}
-    return out;
-  }
-  const results = {};
-  for(const r of roots) results[r] = await walk(r);
-  return { ok:true, node: process.version, roots, pattern, results };
-}
-
 async function op_which(){
-  const core = tryRequireCore();
   const hasCreate = !!(core && typeof core.createAssistant === 'function');
   return {
     ok: true,
@@ -81,13 +49,12 @@ async function op_which(){
 }
 
 async function op_knowledge(){
-  const loadKnowledge = tryLoadKnowledgeFn();
   if(!loadKnowledge) return { ok:false, error:'Fant ikke loadData i noen kjente stier' };
   try{
     const data = loadKnowledge();
-    const files = data?.files || [];
+    const files = data?.faqIndex?.files || data?.files || [];
     const faqCount = data?.count?.faq ?? data?.faq?.length ?? 0;
-    const sample = (data?.faq || []).slice(0,5).map(x => ({ id:x.id, q:x.q, src: x.source || x._src }));
+    const sample = (data?.faq || []).slice(0,5).map(x => ({ id:x.id, q:x.q, src: x._src || x.source }));
     return { ok:true, files: files.length, faqCount, sample };
   }catch(e){
     return { ok:false, error: String(e?.message || e) };
@@ -95,7 +62,6 @@ async function op_knowledge(){
 }
 
 async function op_company(){
-  const loadKnowledge = tryLoadKnowledgeFn();
   if(!loadKnowledge) return { ok:false, error:'Finner ikke loadKnowledge()' };
   try{
     const data = loadKnowledge();
@@ -106,14 +72,14 @@ async function op_company(){
       services: data?.meta?.services || [],
       prices: data?.meta?.prices || {},
       delivery: data?.meta?.delivery || {},
-      sources: (data?.files || []).length
+      sources: (data?.faqIndex?.files || data?.files || []).length
     };
   }catch(e){
     return { ok:false, error: String(e?.message || e) };
   }
 }
 
-// ---- main multiplexer ----
+// ---- main ----
 module.exports = async (req, res) => {
   cors(req, res);
   if (ok204(req, res)) return;
@@ -125,7 +91,6 @@ module.exports = async (req, res) => {
       case 'env': out = await op_env(); break;
       case 'mode': out = await op_mode(); break;
       case 'ping': out = await op_ping(); break;
-      case 'ls': out = await op_ls(req.query||{}); break;
       case 'which': out = await op_which(); break;
       case 'knowledge': out = await op_knowledge(); break;
       case 'company': out = await op_company(); break;
