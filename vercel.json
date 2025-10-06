@@ -8,12 +8,7 @@
   ],
   "functions": {
     "api/**/*.js": {
-      "includeFiles": [
-        "core/**",
-        "data/**",
-        "knowledge/**",
-        "prompt/**"
-      ]
+      "includeFiles": "{core,data,knowledge,prompt}/**"
     }
   }
 }
