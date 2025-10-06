@@ -102,3 +102,22 @@ faq:
       - "tar dere vekk ubrukelig opptak"
     a: "Vi rydder opp og fjerner skurr, blå sekvenser og partier uten innhold der det gir mening."
     tags: ["vhs", "redigering", "opprydding"]
+
+    - id: vhs-reparasjon
+  q: "Reparerer dere kassetter?"
+  alt:
+    - "reparere vhs"
+    - "kan dere fikse kassett"
+    - "båndet er røket"
+    - "ødelagt kassetthus"
+    - "snappet bånd"
+    - "skjøte videobånd"
+    - "reparere minidv"
+    - "fikse video8/hi8"
+    - "manglende tapp"
+    - "skifte hus på kassett"
+  a: |
+    Ja. Vi kan skjøte røket bånd og/eller flytte innholdet over i nytt kassetthus før digitalisering.
+    Enkle reparasjoner gjør vi som del av oppdraget – større arbeid avtales på forhånd.
+  tags: ["vhs","video","reparasjon","tjenester"]
+  
