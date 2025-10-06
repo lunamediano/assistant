@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Luna QA-panel</title>
+  <style>
+    :root { --bg:#0b3b39; --card:#ffffff; --muted:#6b7280; --ok:#16a34a; --err:#dc2626; }
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f6f7f9;margin:0}
+    header{background:var(--bg);color:#fff;padding:14px 18px}
+    main{display:grid;grid-template-columns:280px 1fr;gap:16px;padding:16px}
+    .card{background:var(--card);border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+    .pad{padding:14px}
+    h1{font-size:18px;margin:0}
+    h2{font-size:15px;margin:0 0 8px 0}
+    .muted{color:var(--muted)}
+    .row{display:flex;gap:8px;align-items:center}
+    .col{display:flex;flex-direction:column;gap:8px}
+    input,textarea,button,select{font:inherit}
+    textarea{width:100%;min-height:90px;padding:10px;border:1px solid #e5e7eb;border-radius:10px;resize:vertical}
+    input[type=text]{width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:10px}
+    button{padding:10px 14px;border-radius:10px;border:1px solid #e5e7eb;background:#111;color:#fff;cursor:pointer}
+    button.secondary{background:#fff;color:#111}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;border:1px solid #e5e7eb;background:#fff}
+    .ok{color:var(--ok)}
+    .err{color:var(--err)}
+    pre{margin:0;background:#0f172a;color:#e5e7eb;border-radius:10px;padding:12px;overflow:auto}
+    .list button{display:block;width:100%;text-align:left;background:#fff;border:1px solid #e5e7eb;margin:0 0 8px 0}
+    .kvs{display:grid;grid-template-columns:160px 1fr;gap:6px}
+    .kvs div{padding:6px 8px;border:1px solid #e5e7eb;border-radius:8px;background:#fff}
+    .kvs .k{background:#f9fafb}
+    @media (max-width: 920px){ main{grid-template-columns:1fr} }
+  </style>
+</head>
+<body>
+  <header><h1>Luna QA-panel</h1><div class="muted">Rask test av svar, treff og latens</div></header>
+  <main>
+    <!-- Venstre kolonne: forhåndsspørsmål -->
+    <aside class="card pad">
+      <h2>Eksempelsprørsmål</h2>
+      <div class="list" id="qsList"></div>
+      <div class="row" style="margin-top:8px">
+        <button class="secondary" id="pingBtn">Ping API</button>
+        <button class="secondary" id="envBtn">Vis env</button>
+      </div>
+      <div id="miniOut" class="muted" style="margin-top:8px;font-size:12px"></div>
+    </aside>
+
+    <!-- Høyre kolonne: input + resultat -->
+    <section class="card pad">
+      <div class="col">
+        <div class="grid2">
+          <div>
+            <label class="muted">API URL</label>
+            <input id="apiUrl" type="text" value="https://assistant-sigma-lovat.vercel.app/api/assist" />
+          </div>
+          <div>
+            <label class="muted">Origin (leses fra location)</label>
+            <div class="badge" id="originBadge"></div>
+          </div>
+        </div>
+
+        <label for="q" class="muted">Skriv et spørsmål</label>
+        <textarea id="q" placeholder="f.eks. Hva koster VHS?"></textarea>
+        <div class="row">
+          <button id="sendBtn">Send</button>
+          <button class="secondary" id="clearBtn">Tøm</button>
+        </div>
+
+        <!-- Resultat-topplinje -->
+        <div class="grid2">
+          <div class="card pad">
+            <div class="muted">Status</div>
+            <div id="statusTxt">–</div>
+          </div>
+          <div class="card pad">
+            <div class="muted">Latens</div>
+            <div id="latencyTxt">–</div>
+          </div>
+        </div>
+
+        <!-- Tolkede felter -->
+        <div class="card pad">
+          <h2>Oppsummert</h2>
+          <div class="kvs">
+            <div class="k">Kilde</div><div id="src">–</div>
+            <div class="k">Match</div><div id="match">–</div>
+            <div class="k">Svar</div><div id="ans">–</div>
+          </div>
+        </div>
+
+        <!-- Rå JSON -->
+        <div class="card pad">
+          <h2>Rå respons</h2>
+          <pre id="raw">{ }</pre>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const DEFAULT_QUERIES = [
+      "Hva koster VHS?",
+      "Hvor kan jeg levere?",
+      "Digitaliserer dere smalfilm?",
+      "Bruker dere WetGate?",
+      "Kan dere sende USB i posten?",
+      "Hvor lang leveringstid har dere?",
+      "Tar dere VHS-C, Hi8 og MiniDV?"
+    ];
+
+    const qsList = document.getElementById('qsList');
+    const apiUrl = document.getElementById('apiUrl');
+    const originBadge = document.getElementById('originBadge');
+    const qEl = document.getElementById('q');
+    const sendBtn = document.getElementById('sendBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const statusTxt = document.getElementById('statusTxt');
+    const latencyTxt = document.getElementById('latencyTxt');
+    const src = document.getElementById('src');
+    const match = document.getElementById('match');
+    const ans = document.getElementById('ans');
+    const raw = document.getElementById('raw');
+    const miniOut = document.getElementById('miniOut');
+
+    originBadge.textContent = location.origin;
+
+    function setSummary({status, ms, data}) {
+      statusTxt.textContent = status >= 200 && status < 300 ? `✅ ${status}` : `❌ ${status}`;
+      latencyTxt.textContent = `${ms} ms`;
+      src.textContent = data?.source || '–';
+      match.textContent = data?.meta?.matched_question || '(ingen / LLM)';
+      ans.textContent = data?.answer || data?.text || '–';
+      raw.textContent = JSON.stringify(data, null, 2);
+    }
+
+    async function ask(msg){
+      const url = apiUrl.value.trim();
+      const t0 = performance.now();
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ message: msg })
+      });
+      const t1 = performance.now();
+      const ms = Math.round(t1 - t0);
+      let data = {};
+      try { data = await r.json(); } catch {}
+      setSummary({ status: r.status, ms, data });
+    }
+
+    function addQueryButtons() {
+      DEFAULT_QUERIES.forEach(q => {
+        const b = document.createElement('button');
+        b.textContent = q;
+        b.addEventListener('click', () => { qEl.value = q; ask(q); });
+        qsList.appendChild(b);
+      });
+    }
+
+    sendBtn.addEventListener('click', () => {
+      const v = qEl.value.trim();
+      if (!v) return;
+      ask(v);
+    });
+    clearBtn.addEventListener('click', () => {
+      qEl.value = '';
+      setSummary({status:0, ms:0, data:{}});
+    });
+
+    document.getElementById('pingBtn').addEventListener('click', async () => {
+      miniOut.textContent = '...';
+      try {
+        const r = await fetch(apiUrl.value.trim());
+        const j = await r.json();
+        miniOut.textContent = `Ping: ${r.status} ${JSON.stringify(j)}`;
+      } catch(e) {
+        miniOut.textContent = 'Ping feilet: ' + (e?.message || e);
+      }
+    });
+
+    document.getElementById('envBtn').addEventListener('click', async () => {
+      miniOut.textContent = '...';
+      try {
+        const u = apiUrl.value.trim() + '?fn=env';
+        const r = await fetch(u);
+        const j = await r.json();
+        miniOut.textContent = `Env: ${JSON.stringify(j)}`;
+      } catch(e) {
+        miniOut.textContent = 'Env feilet: ' + (e?.message || e);
+      }
+    });
+
+    addQueryButtons();
+  </script>
+</body>
+</html>
