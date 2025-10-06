@@ -1,0 +1,11 @@
+- id: vhs-reparasjon-pris
+  q: "Hva koster reparasjon av kassett?"
+  alt:
+    - "pris reparere vhs"
+    - "kostnad skjøting"
+    - "bytte kassetthus pris"
+    - "reparasjon videobånd pris"
+  a: |
+    Reparasjoner (f.eks. skjøt av bånd eller bytte hus) prises med minimum ett kvarters teknisk arbeid tillegg til digitaliseringsjobben.
+    Ved større jobb (enn ett kvarter) gir vi pris på forhånd. Endelig pris avhenger av omfang og tilstand.
+  tags: ["vhs","pris","reparasjon"]
