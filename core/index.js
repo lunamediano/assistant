@@ -20,10 +20,10 @@ function createAssistant() {
       const lower = input.toLowerCase();
 
       try {
-        // 1) FAQ
+        // 1) FAQ (nå med score + topK)
         const faqMatch = detectFaq(lower, data.faq);
         if (faqMatch) {
-          DEBUG && console.log('[route] faq ->', faqMatch.id || faqMatch.q);
+          DEBUG && console.log('[route] faq ->', faqMatch.item.id || faqMatch.item.q, faqMatch.score);
           const r = handleFaq(faqMatch);
           if (r) return r;
         }
@@ -36,11 +36,11 @@ function createAssistant() {
           if (r) return r;
         }
 
-        // 3) Pris/levering
+        // 3) Pris/levering (nå med enkel kalkulator når tall oppgis)
         const priceIntent = detectPriceIntent(lower);
         if (priceIntent) {
           DEBUG && console.log('[route] price ->', priceIntent);
-          const r = handlePriceIntent(priceIntent, data.meta);
+          const r = handlePriceIntent(priceIntent, data.meta, lower); // 👈 pass inn bruker-tekst
           if (r) return r;
         }
 
@@ -50,7 +50,6 @@ function createAssistant() {
 
       } catch (err) {
         console.error('[assistant] error:', err);
-        // NB: vi svarer kontrollert, ikke kaster:
         return {
           type: 'answer',
           text: 'Beklager, noe gikk galt på serveren. Prøv igjen om litt.',
