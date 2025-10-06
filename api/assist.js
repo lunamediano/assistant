@@ -1,4 +1,4 @@
-// /api/assist.js  (CommonJS – health, debug og chat i én lambda)
+// /api/assist.js  (CommonJS – health, debug og chat i én lambda...)
 
 const { createAssistant } = require('../core');
 const { loadKnowledge }   = require('../data/loadData');
