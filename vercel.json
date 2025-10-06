@@ -5,5 +5,15 @@
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/$1.js" }
-  ]
+  ],
+  "functions": {
+    "api/**/*.js": {
+      "includeFiles": [
+        "core/**",
+        "data/**",
+        "knowledge/**",
+        "prompt/**"
+      ]
+    }
+  }
 }
