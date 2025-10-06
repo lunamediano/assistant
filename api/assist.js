@@ -1,4 +1,4 @@
-// build-bump: 2025-10-06T10:55Z
+// build-bump: 2025-10-06T11:55Z
 
 // /api/assist.js  (CommonJS – health, debug og chat i én lambda)
 
@@ -63,7 +63,7 @@ const dbg = {
       const faqCount = data?.count?.faq ?? data?.faq?.length ?? 0;
       const sample = (data?.faq || [])
         .slice(0, 5)
-        .map(x => ({ id: x.id, q: x.q, src: x._src || x.source }));
+        .map(x => ({ id: x.id, q: x.q, src: x._src || x.source || x.src }));
       return { ok: true, files: files.length, faqCount, sample };
     } catch (e) {
       return { ok: false, error: String(e?.message || e) };
@@ -106,28 +106,31 @@ module.exports = async (req, res) => {
     // POST = chat
     let body = req.body;
     if (typeof body === 'string') {
-      try {
-        body = JSON.parse(body);
-      } catch {
-        body = {};
-      }
+      try { body = JSON.parse(body); } catch { body = {}; }
     }
 
-    const text = (body?.message || body?.text || '').trim();
+    const text  = (body?.message || body?.text || '').trim();
+    const trace = (req.query && (req.query.trace === '1' || req.query.trace === 'true')) || !!body?.trace;
+
     if (!text) return res.status(400).json({ error: 'Missing message' });
 
     const result = await getAssistant().handle({ text });
 
     if (result && typeof result.text === 'string') {
-      // ✅ Returner både "answer" og "text" for bakoverkompatibilitet
-      const payload = {
+      // Skjul top-k kandidater fra meta hvis trace ikke er slått på
+      let meta = result.meta || null;
+      if (meta && !trace && meta.candidates) {
+        const { candidates, ...rest } = meta;
+        meta = rest;
+      }
+
+      return res.status(200).json({
         ok: true,
         answer: result.text,
         text: result.text,
-        meta: result.meta || null,
+        meta,
         source: result.type || 'answer'
-      };
-      return res.status(200).json(payload);
+      });
     }
 
     // fallback hvis resultatet ikke har tekst
