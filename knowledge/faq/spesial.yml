@@ -1,66 +1,83 @@
 version: 1
 faq:
   # --------------- SPESIAL / PRODUKSJON ---------------
+
   - id: spesial-med-egne-ord
-    q: "Hva er «Med egne ord»?"
+    q: Hva er «Med egne ord»?
     alt:
-      - "med egne ord tjeneste"
-      - "hva betyr med egne ord"
-      - "kan dere ta opp min historie"
-      - "intervju og fortelling film"
-      - "familiehistorie film"
-      - "minnefilm tjeneste"
-      - "personlig historie video"
-      - "samtale på film"
-      - "opptak av tale"
-      - "fortellerfilm"
-    a: |
-      "Med egne ord" er en tjeneste hvor vi dokumenterer din personlige historie.
-      Resultatet er en ferdig film med lyd, titler og eventuelt bilder/klipp.
-      En fantastisk gave til familie og/eller venner.
+      - med egne ord tjeneste
+      - hva betyr med egne ord
+      - kan dere ta opp min historie
+      - intervju og fortelling film
+      - familiehistorie film
+      - minnefilm tjeneste
+      - personlig historie video
+      - samtale på film
+      - opptak av tale
+      - fortellerfilm
+    a: >
+      **«Med egne ord»** er en tjeneste der vi dokumenterer din personlige historie.
+      Resultatet er en ferdig film med lyd, titler og eventuelt bilder eller klipp.
+      En verdifull gave til familie og venner – som vil vokse i verdi for hvert år som går.
+      Du kan jo selv tenke deg hvor verdifullt det hadde vært for deg å kunne oppleve dine egne
+      beste-, olde- eller tippoldeforeldre fortelle sin egen historie.
+      Kontakt oss gjerne på telefon eller e-post for et prisestimat/tilbud!
     tags: ["spesial", "med egne ord", "minnefilm", "intervju"]
 
   - id: spesial-bryllup-konfirmasjon
-    q: "Lager dere film til bryllup og konfirmasjon?"
+    q: Lager dere film til bryllup og konfirmasjon?
     alt:
-      - "bryllupsvideo"
-      - "konfirmasjonsfilm"
-      - "videograf bryllup"
-      - "film til selskap"
-      - "høytidsfilm"
-      - "seremoni og fest film"
-      - "video til feiring"
-      - "bryllupsfilm pris"
-      - "konfirmasjon video opptak"
-      - "redigering av bryllupsfilm"
-    a: |
-      Ja. Vi kan filme, klippe og levere en fin film klar til visning og deling.
+      - bryllupsvideo
+      - konfirmasjonsfilm
+      - videograf bryllup
+      - film til selskap
+      - høytidsfilm
+      - seremoni og fest film
+      - video til feiring
+      - bryllupsfilm pris
+      - konfirmasjon video opptak
+      - redigering av bryllupsfilm
+    a: >
+      Ja. Vi kan, gjerne basert på dine egne film- eller videoopptak eller fotografier,
+      redigere og levere en flott film klar til visning og deling –
+      enten dokumentarisk eller kreativt etter ønske. Vi skal gjøre hva vi kan for at filmen blir festens høydepunkt!
+      Kontakt oss gjerne på telefon eller e-post for et prisestimat/tilbud!
     tags: ["spesial", "bryllup", "konfirmasjon", "arrangement"]
 
   - id: spesial-bedrift
-    q: "Tilbyr dere videoproduksjon for bedrift/organisasjon?"
+    q: Tilbyr dere videoproduksjon for bedrift eller organisasjon?
     alt:
-      - "bedriftsfilm"
-      - "innholdsfilm"
-      - "informasjonsvideo"
-      - "produktfilm"
-      - "rekrutteringsfilm"
-      - "profilfilm"
-      - "video for sosiale medier"
-      - "firmafilm"
-      - "presentasjonsfilm"
-      - "videoopptak bedrift"
-    a: |
-      Ja. Vi bistår i planleggingen, og tar oss av opptak og etterarbeid –
-      fra korte innholdsfilmer til informasjonsvideoer og profilfilm.
+      - bedriftsfilm
+      - innholdsfilm
+      - informasjonsvideo
+      - produktfilm
+      - rekrutteringsfilm
+      - dokumentasjon av møter eller arrangementer
+      - profilfilm
+      - video for sosiale medier
+      - firmafilm
+      - presentasjonsfilm
+      - videoopptak bedrift
+    a: >
+      Ja. Vi bistår i planleggingen og tar oss av opptak og etterarbeid –
+      fra korte innholdsfilmer til informasjonsvideoer, profilfilm og dokumentasjonsfilmer.
+      Filmen kan du legge ut på bedriftens nettside eller i sosiale medier som Facebook, Instagram m.m.
+      Kontakt oss gjerne på telefon eller e-post for et prisestimat/tilbud!
     tags: ["spesial", "bedrift", "produksjon", "video"]
 
   - id: spesial-drone
-    q: "Tar dere droneopptak (stillbilder og video)?"
+    q: Tar dere droneopptak (stillbilder og video)?
     alt:
-      - "dronefoto"
-      - "dronevideo"
-      - "luftfoto eiendom"
-      - "drone 4k"
-      - "flyfoto"
-      - "dro
+      - dronefoto
+      - dronevideo
+      - luftfoto eiendom
+      - drone 4k
+      - flyfoto
+      - drone film
+      - droneopptak
+      - drone tjeneste
+    a: >
+      Ja, vi tilbyr dronefoto og dronevideo i 4K-kvalitet – for eiendom, bedrift,
+      arrangementer eller andre formål. Alt utføres med godkjent operatør og nødvendig tillatelse.
+      Kontakt oss gjerne på telefon eller e-post for et prisestimat/tilbud!
+    tags: ["spesial", "drone", "foto", "video"]
