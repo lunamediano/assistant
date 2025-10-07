@@ -30,16 +30,6 @@ function setCors(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
-// i loadData.js eller tilsvarende
-const knowledgeFiles = [
-  'knowledge/faq_round1.yml',   // legg denne først!
-  'knowledge/faq/video.yml',
-  'knowledge/faq/smalfilm.yml',
-  'knowledge/faq/foto.yml',
-  'knowledge/faq/pris.yml',
-  'knowledge/faq/spesial.yml'
-];
-
 // ---- debug helpers ----
 const dbg = {
   env: () => ({
