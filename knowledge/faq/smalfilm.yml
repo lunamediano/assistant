@@ -2,26 +2,40 @@ version: 1
 faq:
   # ---------------- SMALFILM ----------------
   - id: smalfilm-tilbyr-digitalisering
-    q: "Digitaliserer dere smalfilm (8 mm / Super 8)?"
+    q: "Digitaliserer dere smalfilm (8 mm / Super 8 / 16 mm)?"
     alt:
       - "super 8 digitalisering"
       - "8mm overføring til fil"
       - "digitalisere gamle smalfilmer"
       - "smalfilm til mp4"
       - "digitalisere 8 mm film"
+      - "digitalisere 16 mm film"
       - "overføre super8 film"
+      - "overføre 16 mm film"
       - "8mm film til usb"
+      - "16mm film til usb"
       - "smalfilm konvertering"
       - "super8 til digitalt"
+      - "16 mm til digitalt"
+      - "16 mm med optisk lyd"
+      - "16 mm med lyd"
     a: |
-      Vi digitaliserer smalfilm i beste 4K-format på vår avanserte MWA-skanner.
+      Vi digitaliserer smalfilm (med og uten lyd) i beste 4K-format på vår avanserte MWA-skanner.
       Inkludert i prisen er WetGate-rens for best mulig resultat.
-    tags: ["smalfilm", "super8", "8mm", "tjenester"]
+    tags: ["smalfilm", "super8", "8mm", "16mm", "tjenester"]
 
   - id: smalfilm-pris
     q: "Hva koster det å digitalisere smalfilm?"
     alt:
+      - "smalfilm"
+      - "smalfilm?"
+      - "og smalfilm"
+      - "smalfilm pris"
+      - "pris smalfilm"
       - "pris super 8"
+      - "super 8 pris"
+      - "16mm pris"
+      - "16 mm pris"
       - "kostnad per minutt smalfilm"
       - "hva koster 15 meter film"
       - "smalfilm til digital pris"
@@ -31,10 +45,16 @@ faq:
       - "super8 kostnad"
       - "smalfilm digitalisering kostnad"
       - "hva koster digitalisering av 8mm"
+      - "hva koster digitalisering av 16mm"
       - "minuttpris super 8"
+      - "minuttpris 16 mm"
     a: |
-      Fra ca. kr 75 per minutt + startgebyr kr 95 per rull.
-      Vi gir rabatt ved større mengder.
+      Pris for 8 mm/Super 8: fra ca. kr 75 per minutt.
+      16 mm: fra ca. kr 90 per minutt.
+      Startgebyr: kr 95 per rull.
+      Filmer med lyd gir et tillegg.
+      Vi gir rabatt ut fra omfang. Kontakt oss på telefon eller e-post, så kan vi gi et prisestimat/tilbud basert på anslått mengde.
+      Usikker på mengden? Oppgi gjerne **diameter på rullene** (på selve filmrullen, ikke spolen/huben).
     tags: ["smalfilm", "pris"]
 
   - id: smalfilm-wetgate
@@ -51,8 +71,9 @@ faq:
       - "wetgate hos dere"
       - "film rens kvalitet"
     a: |
-      Vårt unike WetGate-rensesystem fjerner typisk 70–80 % av riper
-      og inngrodd smuss på smalfilmene dine.
+      Vi renser først filmene manuelt for å fjerne overfladisk støv og smuss.
+      Deretter fjerner vårt WetGate-system typisk 70–80 % av riper og inngrodd smuss.
+      WetGate er en integrert del av skanneprosessen.
     tags: ["smalfilm", "kvalitet", "wetgate"]
 
   - id: smalfilm-format-opplosning
@@ -69,7 +90,8 @@ faq:
       - "format på leveransen"
       - "leverer dere prores/mov"
     a: |
-      MP4 i 4K-format (høy bitrate) eller ProRes/MOV (mer ukomprimert/rå).
+      Du får filene i ønsket format: MP4 i høy kvalitet (opptil 4K) eller ProRes/MOV (mer ukomprimert/rå).
+      Ta gjerne kontakt hvis du har tekniske preferanser – vi veileder deg til riktig valg.
     tags: ["smalfilm", "format", "4k", "leveranse"]
 
   - id: smalfilm-leveringstid
@@ -85,7 +107,9 @@ faq:
       - "når får jeg smalfilm ferdig"
       - "gjennomløpstid super8"
       - "standard levering smalfilm"
-    a: "Normalt 4–14 dager, maks 3 uker."
+    a: >
+      Normalt 4–14 dager, maks 3 uker.
+      Kontakt oss på telefon eller e-post for et mer presist estimat ut fra anslått omfang.
     tags: ["smalfilm", "leveringstid"]
 
   - id: smalfilm-etterarbeid
@@ -103,5 +127,5 @@ faq:
       - "fortellertekst på film"
     a: |
       Ja. Vi kan legge på kommentarer/voiceover, musikk, tekstplakater og kapitler.
-      Vi viser deg gjerne eksempler.
+      Ta gjerne kontakt – vi viser deg eksempler.
     tags: ["smalfilm", "etterarbeid", "redigering"]
