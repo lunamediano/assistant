@@ -1,6 +1,6 @@
-// build-bump: 2025-10-06T10:55Z
+// build-bump: 2025-10-07T12:25Z  (fail-safe chat: never 500 on POST)
 
-// /api/assist.js  (CommonJS – health, debug og chat i én lambda)
+// /api/assist.js
 
 const { createAssistant } = require('../core');
 const { loadKnowledge }   = require('../data/loadData');
@@ -30,7 +30,7 @@ function setCors(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
-// ---- debug helpers (enkel/stabil) ----
+// ---- debug helpers (stabile) ----
 const dbg = {
   env: () => ({
     ASSISTANT_MODE: process.env.ASSISTANT_MODE || 'unset',
@@ -49,31 +49,28 @@ const dbg = {
   },
   which: () => {
     const hasCreate = typeof require('../core').createAssistant === 'function';
-    return {
-      ok: true,
-      hasCreate,
-      required: hasCreate ? ['createAssistant'] : [],
-      error: hasCreate ? null : 'Fant ikke core eller createAssistant'
-    };
+    return { ok: true, hasCreate, required: hasCreate ? ['createAssistant'] : [], error: hasCreate ? null : 'Fant ikke core eller createAssistant' };
   },
   knowledge: () => {
     try {
       const data = loadKnowledge();
       const files = data?.faqIndex?.files || data?.files || [];
       const faqCount = data?.count?.faq ?? data?.faq?.length ?? 0;
-      const sample = (data?.faq || [])
-        .slice(0, 5)
-        .map(x => ({ id: x.id, q: x.q, src: x._src || x.source || x.src }));
-      return { ok: true, files: files.length, faqCount, sample };
-    } catch (e) {
-      return { ok: false, error: String(e?.message || e) };
-    }
+      const sample = (data?.faq || []).slice(0,5).map(x => ({ id:x.id, q:x.q, src: x._src || x.source || x.src }));
+      return { ok:true, files: files.length, faqCount, sample };
+    } catch(e) { return { ok:false, error: String(e?.message || e) }; }
   },
+  version: () => ({
+    ok: true,
+    build: process.env.VERCEL_GIT_COMMIT_AUTHOR_DATE || new Date().toISOString(),
+    commit: process.env.VERCEL_GIT_COMMIT_SHA || 'unknown',
+    tag: process.env.VERCEL_ENV || 'unknown'
+  }),
   company: () => {
     try {
       const data = loadKnowledge();
       return {
-        ok: true,
+        ok:true,
         hasCompany: !!data?.meta?.company,
         company: data?.meta?.company || null,
         services: data?.meta?.services || [],
@@ -81,9 +78,7 @@ const dbg = {
         delivery: data?.meta?.delivery || {},
         sources: (data?.faqIndex?.files || data?.files || []).length
       };
-    } catch (e) {
-      return { ok: false, error: String(e?.message || e) };
-    }
+    } catch(e) { return { ok:false, error: String(e?.message || e) }; }
   }
 };
 
@@ -92,39 +87,55 @@ module.exports = async (req, res) => {
     setCors(req, res);
     if (req.method === 'OPTIONS') return res.status(204).end();
 
-    // GET = health eller debug (?fn=env|mode|which|knowledge|company)
+    // GET = health/debug
     if (req.method === 'GET') {
       const fn = (req.query && req.query.fn) || null;
-      if (!fn) return res.status(200).json({ status: 'ok', time: new Date().toISOString() });
+      if (!fn) return res.status(200).json({ status:'ok', time:new Date().toISOString() });
       if (dbg[fn]) return res.status(200).json(dbg[fn]());
-      return res.status(400).json({ ok: false, error: `Ukjent fn=${fn}` });
+      return res.status(400).json({ ok:false, error:`Ukjent fn=${fn}` });
     }
 
-    if (req.method !== 'POST')
-      return res.status(405).json({ error: 'Method not allowed' });
+    if (req.method !== 'POST') return res.status(405).json({ error:'Method not allowed' });
 
-    // POST = chat
+    // POST = chat (fail-safe)
     let body = req.body;
-    if (typeof body === 'string') {
-      try { body = JSON.parse(body); } catch { body = {}; }
+    if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
+
+    const text  = (body?.message || body?.text || '').trim();
+    const trace = (req.query && (req.query.trace === '1' || req.query.trace === 'true')) || !!body?.trace;
+    if (!text) return res.status(400).json({ error:'Missing message' });
+
+    let result;
+    try {
+      result = await getAssistant().handle({ text });
+    } catch (e) {
+      // <-- Nøkkel: ikke 500 – gi fallback + feildetaljer i meta når trace=1
+      console.error('[assist] handle() error:', e && e.stack ? e.stack : e);
+      const meta = trace ? { error: String(e?.message || e), route: 'exception' } : null;
+      return res.status(200).json({
+        ok: true,
+        answer: 'Jeg er ikke helt sikker – kan du utdype litt?',
+        text: 'Jeg er ikke helt sikker – kan du utdype litt?',
+        meta,
+        source: 'error'
+      });
     }
-
-    const text = (body?.message || body?.text || '').trim();
-    if (!text) return res.status(400).json({ error: 'Missing message' });
-
-    const result = await getAssistant().handle({ text });
 
     if (result && typeof result.text === 'string') {
+      let meta = result.meta || null;
+      if (meta && !trace && meta.candidates) {
+        const { candidates, ...rest } = meta;
+        meta = rest;
+      }
       return res.status(200).json({
         ok: true,
         answer: result.text,
         text: result.text,
-        meta: result.meta || null,
+        meta,
         source: result.type || 'answer'
       });
     }
 
-    // fallback hvis resultatet ikke har tekst
     return res.status(200).json({
       ok: true,
       answer: 'Jeg er ikke helt sikker – kan du utdype litt?',
@@ -133,12 +144,8 @@ module.exports = async (req, res) => {
     });
 
   } catch (err) {
-    console.error('[assist] error:', err && err.stack ? err.stack : err);
-    return res.status(500).json({
-      ok: false,
-      answer: 'Server error',
-      text: 'Server error',
-      error: 'Server error'
-    });
+    // Denne blokken fanger *kun* toppnivå-feil (ikke fra handle) – behold som 500
+    console.error('[assist] fatal error:', err && err.stack ? err.stack : err);
+    return res.status(500).json({ ok:false, answer:'Server error', text:'Server error', error:'Server error' });
   }
 };
