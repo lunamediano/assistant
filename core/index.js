@@ -5,33 +5,45 @@ const { detectPriceIntent, handlePriceIntent } = require('./handlers/priceHandle
 const { fallbackHandler } = require('./handlers/fallbackHandler');
 const { loadKnowledge } = require('../data/loadData');
 
+function deriveTopicFromHistory(history = []) {
+  // se på siste bruker- eller assistentmelding
+  const last = [...history].reverse().find(m => typeof m?.text === 'string');
+  if (!last) return null;
+
+  const t = (last.topic || '').toLowerCase();
+  if (t) return t; // hvis klienten allerede satte topic
+
+  const text = (last.text || '').toLowerCase();
+  if (/vhs|videokassett|videobånd|video8|hi8|minidv|video/.test(text)) return 'video';
+  if (/smalfilm|super ?8|8mm|16 ?mm/.test(text)) return 'smalfilm';
+  if (/foto|bilde|bilder|dias|negativ/.test(text)) return 'foto';
+
+  // prøv også meta fra forrige svar (dersom klienten sender den tilbake)
+  const metaSrc = (last.meta && last.meta.src) || '';
+  if (/\/video\.yml/i.test(metaSrc)) return 'video';
+  if (/\/smalfilm\.yml/i.test(metaSrc)) return 'smalfilm';
+  if (/\/foto\.yml/i.test(metaSrc)) return 'foto';
+
+  return null;
+}
+
 function createAssistant() {
-  // Last all kunnskap én gang ved cold start
   const data = loadKnowledge();
 
   return {
-    /**
-     * @param {object} args
-     * @param {string} args.text        Brukerens melding
-     * @param {Array}  [args.history]   Samtalehistorikk (array av {role, content} eller lign.)
-     */
     async handle({ text, history = [] }) {
       const lower = (text || '').toLowerCase();
+      const topicHint = deriveTopicFromHistory(history);
 
-      // 0) Firma / praktisk info først (fanger "Hva tilbyr dere?", åpningstider, adresse osv.)
+      // 0) Company først
       const compIntent = detectCompanyIntent(lower);
       if (compIntent) {
         const r = handleCompanyIntent(compIntent, data.meta);
-        if (r) {
-          return {
-            ...r,
-            meta: { ...(r.meta || {}), route: 'company', intent: compIntent }
-          };
-        }
+        if (r) return { ...r, meta: { ...(r.meta || {}), route: 'company', intent: compIntent } };
       }
 
-      // 1) FAQ – direkte treff mot kunnskapsbasen
-      const faqMatch = detectFaq(lower, data.faq);
+      // 1) FAQ – med topicHint-boost
+      const faqMatch = detectFaq(lower, data.faq, { topicHint });
       if (faqMatch) {
         const r = handleFaq(faqMatch);
         return {
@@ -39,27 +51,21 @@ function createAssistant() {
           meta: {
             ...(r.meta || {}),
             route: 'faq',
-            id: faqMatch.id,
-            src: faqMatch._src || faqMatch.source
+            topicHint: topicHint || null
           }
         };
       }
 
-      // 2) Pris – kontekstsensitiv (bruker history for generiske spørsmål som "hva koster det?")
-      const priceIntent = detectPriceIntent(lower, history);
+      // 2) Pris (beholder som før – men kan også bruke topicHint her inni handleren hvis ønskelig)
+      const priceIntent = detectPriceIntent(lower);
       if (priceIntent) {
-        const r = handlePriceIntent(priceIntent, data);
-        if (r) {
-          return {
-            ...r,
-            meta: { ...(r.meta || {}), route: 'price', intent: priceIntent }
-          };
-        }
+        const r = handlePriceIntent(priceIntent, data.meta);
+        if (r) return { ...r, meta: { ...(r.meta || {}), route: 'price', intent: priceIntent } };
       }
 
       // 3) Fallback
       const r = fallbackHandler(text);
-      return { ...r, meta: { route: 'fallback' } };
+      return { ...r, meta: { route: 'fallback', topicHint: topicHint || null } };
     }
   };
 }
