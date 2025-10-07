@@ -1,15 +1,16 @@
 version: 1
 faq:
   # ---------------- SMALFILM ----------------
+
   - id: smalfilm-tilbyr-kort
-  q: "Digitaliserer dere smalfilm?"
-  alt:
-    - "kan dere digitalisere smalfilm"
-    - "smalfilm til digitalt"
-    - "8mm til mp4"
-    - "super8 til mp4"
-  a: "Ja. Vi digitaliserer 8 mm/Super 8/16 mm (med/uten lyd) – skannet i 4K med WetGate-rens."
-  tags: ["smalfilm","tjenester"]
+    q: "Digitaliserer dere smalfilm?"
+    alt:
+      - "kan dere digitalisere smalfilm"
+      - "smalfilm til digitalt"
+      - "8mm til mp4"
+      - "super8 til mp4"
+    a: "Ja. Vi digitaliserer 8 mm/Super 8/16 mm (med/uten lyd) – skannet i 4K med WetGate-rens."
+    tags: ["smalfilm","tjenester"]
 
   - id: smalfilm-tilbyr-digitalisering
     q: "Digitaliserer dere smalfilm (8 mm / Super 8 / 16 mm)?"
@@ -40,7 +41,8 @@ faq:
       - "smalfilm"
       - "smalfilm?"
       - "og smalfilm"
-      - "smalfilm pris"
+      - "smalfilm også"
+      - "smalfilmpris"
       - "pris smalfilm"
       - "pris super 8"
       - "super 8 pris"
