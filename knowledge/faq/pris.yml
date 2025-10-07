@@ -1,11 +1,57 @@
-- id: vhs-reparasjon-pris
-  q: "Hva koster reparasjon av kassett?"
-  alt:
-    - "pris reparere vhs"
-    - "kostnad skjøting"
-    - "bytte kassetthus pris"
-    - "reparasjon videobånd pris"
-  a: |
-    Reparasjoner (f.eks. skjøt av bånd eller bytte hus) prises med minimum ett kvarters teknisk arbeid tillegg til digitaliseringsjobben.
-    Ved større jobb (enn ett kvarter) gir vi pris på forhånd. Endelig pris avhenger av omfang og tilstand.
-  tags: ["vhs","pris","reparasjon"]
+version: 1
+faq:
+
+  - id: pris-betaling
+    q: Hvordan betaler jeg for digitalisering?
+    a: >
+      Du kan betale med Vipps eller med **faktura** i nettbanken din etter at oppdraget er ferdig.
+      For større prosjekter kan delbetaling avtales.
+
+  - id: pris-rabatt
+    q: Har dere mengderabatt?
+    a: >
+      Ja, vi ser an omfanget på oppdraget før vi gir et pristilbud på jobben som skal utføres.
+      Vi gir eksempelvis **–10 %** fra **10 timer video** eller tilsvarende mengde,
+      og **–20 %** fra **20 timer**. Rabatten gjelder også ved kombinert innlevering av
+      video, smalfilm og foto. Kontakt oss gjerne på telefon eller e-post, så vi får et
+      inntrykk av hva du ønsker å få utført.
+
+  - id: pris-minnepenn
+    q: Hva koster minnepenn eller USB?
+    a: >
+      Vi leverer vanligvis på **USB-minnepenn fra kr 295,-**.
+      Du kan også levere egen USB eller få filene som **nedlasting** fra sikker lenke.
+      DVD kan lages på forespørsel.
+
+  - id: pris-beregning
+    q: Hvordan beregnes prisen?
+    a: >
+      Film og video: Prisen beregnes etter **antall timer videoinnhold** eller **antall minutter smalfilm**.
+      Alt digitaliseres og leveres som ferdige filer i MP4-format med optimal kvalitet.
+      Foto og dias prises **per bilde**.
+      Dronefotografering og -opptak, videodokumentasjon og -produksjon m.m. prissettes ut fra oppdragets omfang –
+      her må vi ha nærmere informasjon før vi kan gi et prisestimat.
+      Du får alltid et **uforpliktende pristilbud** før oppstart.
+
+  - id: pris-eksempel
+    q: Kan jeg få et priseksempel?
+    a: >
+      En vanlig videokassett med ca. 2 timer opptak koster **kr 630,-** å digitalisere.
+      Tilsvarende 10 kassetter vil koste rundt **kr 5 670,-** etter mengderabatt.
+      Smalfilm starter på **kr 75,- per minutt**, og fotoskanning fra **kr 10,- per bilde**.
+      For andre typer oppdrag: kontakt oss, så gir vi et prisestimat/tilbud.
+
+  - id: vhs-reparasjon-pris
+    q: Hva koster reparasjon av kassett?
+    alt:
+      - pris reparasjon vhs
+      - pris reparere kassett
+      - kostnad skjøting
+      - bytte kassetthus pris
+      - reparasjon videobånd pris
+      - skjøte bånd pris
+    a: >
+      Reparasjoner (f.eks. skjøting av bånd eller bytte av kassetthus) prises med minimum **ett kvarter teknisk arbeid**
+      i tillegg til digitaliseringsjobben. Ved større jobb gir vi pris på forhånd. Endelig pris avhenger av omfang
+      og tilstand. Ring eller send en e-post, så vurderer vi skaden og gir et estimat.
+    tags: ["vhs", "pris", "reparasjon"]
