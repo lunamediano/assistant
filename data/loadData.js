@@ -1,11 +1,13 @@
-// /api/data/loadData.js
+// api/data/loadData.js
 const fs = require('fs');
 const path = require('path');
 const fg = require('fast-glob');
 const YAML = require('js-yaml');
 const { KnowledgeDoc } = require('./schema');
 
-const KNOWLEDGE_DIR = path.join(__dirname, '..', 'knowledge'); // api/knowledge
+const KNOWLEDGE_DIR = path.join(__dirname, '..', 'knowledge');
+
+let _cache = null;
 
 function normalizeFaqItem(entry, file) {
   const q = entry.q || entry.question;
@@ -36,6 +38,8 @@ function mergeMeta(into, from, file) {
 }
 
 function loadKnowledge() {
+  if (_cache) return _cache; // ✅ cache-hit
+
   const patterns = [
     path.join(KNOWLEDGE_DIR, '**/*.y?(a)ml'),
     '!' + path.join(KNOWLEDGE_DIR, '**/_*.y?(a)ml'),
@@ -79,4 +83,14 @@ function loadKnowledge() {
       allFaq.push(item);
     }
 
-    mergeMeta(meta, parsed.data, file
+    mergeMeta(meta, parsed.data, file);
+  }
+
+  _cache = { faq: allFaq, meta, faqIndex: { files }, count: { faq: allFaq.length } };
+  return _cache;
+}
+
+// Valgfritt: kall denne hvis du vil tvinge reload (f.eks. fra en debug-route)
+function invalidate() { _cache = null; }
+
+module.exports = { loadKnowledge, invalidate };
