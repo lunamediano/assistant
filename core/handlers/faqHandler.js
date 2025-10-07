@@ -1,8 +1,8 @@
 // core/handlers/faqHandler.js
-
 const { loadKnowledge } = require('../../data/loadData');
 
-function normalize(s) {
+// --- utils ---
+function norm(s) {
   return (s || '')
     .toLowerCase()
     .normalize('NFKD')
@@ -10,87 +10,124 @@ function normalize(s) {
     .replace(/\s+/g, ' ')
     .trim();
 }
-
-function tokenSet(str) {
-  return new Set(normalize(str).split(' ').filter(Boolean));
+function tokens(s) {
+  return norm(s).split(' ').filter(Boolean);
+}
+function containsPhrase(hay, needle) {
+  return norm(hay).includes(norm(needle));
+}
+function anyContains(hay, arr) {
+  const h = norm(hay);
+  return arr.some(p => h.includes(norm(p)));
 }
 
-function jaccard(a, b) {
-  const A = tokenSet(a), B = tokenSet(b);
-  let inter = 0;
-  for (const t of A) if (B.has(t)) inter++;
-  const uni = A.size + B.size - inter;
-  return uni === 0 ? 0 : inter / uni;
-}
+// Formatord for hinting/penalty
+const VIDEO_WORDS   = ['vhs','video','minidv','mini dv','video8','hi8','digital8','vhs c','camcorder'];
+const SMALFILM_WORDS= ['smalfilm','super 8','super8','8mm','8 mm','16mm','16 mm'];
 
-/**
- * Finn beste match (med top-K trace)
- * @returns {null | { item, score, candidates:[{id,q,score,src}] }}
- */
-function detectFaq(userText, faqList, opts = {}) {
-  if (!userText || !Array.isArray(faqList) || faqList.length === 0) return null;
+const HIGH_PRIORITY_RULES = [
+  // Q: "Hva tilbyr dere?"
+  {
+    when: (q) => anyContains(q, ['hva tilbyr dere','hva gjør dere','hvilke tjenester']),
+    pick: (faq) => faq.find(x => x.id === 'intro-tjenester')
+  },
+];
 
-  const minScore = typeof opts.minScore === 'number' ? opts.minScore : 0.50; // skjerpet terskel
-  const qn = normalize(userText);
+function scoreCandidate(query, item, idxOrderBias = 0) {
+  // Base materials
+  const qn = norm(query);
+  const qtoks = tokens(query);
+  const fields = [item.q, ...(item.alt || [])].map(norm).filter(Boolean);
 
-  const scored = [];
+  let score = 0;
 
-  for (const item of faqList) {
-    const baseQ = item.q || '';
-    const baseScore = jaccard(qn, baseQ);
-
-    let altScore = 0;
-    for (const alt of item.alt || []) {
-      let score = jaccard(qn, alt);
-      // lite bonus ved "inneholder"
-      const an = normalize(alt);
-      if (an.includes(qn) || qn.includes(an)) score = Math.max(score, 0.75);
-      if (score > altScore) altScore = score;
-    }
-
-    const containsBonus =
-      normalize(baseQ).includes(qn) || qn.includes(normalize(baseQ)) ? 0.15 : 0;
-
-    const score = Math.max(baseScore + containsBonus, altScore);
-
-    scored.push({
-      item,
-      score,
-      id: item.id,
-      q: item.q,
-      src: item._src || item.source || item.src
-    });
+  // 1) Exact phrase hits (on q or any alt)
+  for (const f of fields) {
+    if (qn === f) score += 120;
+    if (f.includes(qn)) score += 80; // query as substring of field
+    if (qn.includes(f) && f.length > 6) score += 40; // field is contained in query (avoid tiny words)
   }
 
-  scored.sort((a, b) => b.score - a.score);
-  const best = scored[0];
+  // 2) Token overlap: +6 per shared token (diminishing)
+  for (const t of qtoks) {
+    if (!t) continue;
+    if (fields.some(f => f.split(' ').includes(t))) score += 6;
+    else if (fields.some(f => f.includes(t))) score += 2;
+  }
 
-  if (!best || best.score < minScore) return null;
+  // 3) Format boosting / penalty
+  const mentionsVideo    = anyContains(query, VIDEO_WORDS);
+  const mentionsSmalfilm = anyContains(query, SMALFILM_WORDS);
 
-  return {
-    item: best.item,
-    score: best.score,
-    candidates: scored.slice(0, 3).map(x => ({
-      id: x.id, q: x.q, score: +x.score.toFixed(3), src: x.src
-    }))
-  };
+  const isVideoFaq = (item.tags || []).includes('vhs') || (item.tags || []).includes('video');
+  const isSmalFaq  = (item.tags || []).includes('smalfilm');
+
+  if (mentionsVideo && isVideoFaq) score += 40;
+  if (mentionsSmalfilm && isSmalFaq) score += 40;
+
+  // Penalize cross-domain confusion when user is explicit
+  if (mentionsVideo && isSmalFaq && !isVideoFaq) score -= 35;
+  if (mentionsSmalfilm && isVideoFaq && !isSmalFaq) score -= 35;
+
+  // 4) Light boost for very short queries that contain a clear domain word
+  if (qtoks.length <= 4) {
+    if (mentionsVideo && isVideoFaq) score += 10;
+    if (mentionsSmalfilm && isSmalFaq) score += 10;
+  }
+
+  // 5) Tie-breaker: prefer earlier files (round1 first) via tiny bias
+  score += idxOrderBias;
+
+  return score;
 }
 
-function handleFaq(matchOrItem) {
-  const item = matchOrItem?.item || matchOrItem;
-  const score = typeof matchOrItem?.score === 'number' ? matchOrItem.score : undefined;
-  const candidates = Array.isArray(matchOrItem?.candidates) ? matchOrItem.candidates : undefined;
+// Public API used by /core
+function detectFaq(userText, faqList) {
+  const q = userText || '';
+  if (!q.trim()) return null;
 
+  // 0) High-priority explicit picks
+  for (const rule of HIGH_PRIORITY_RULES) {
+    try {
+      if (rule.when(q)) {
+        const chosen = rule.pick(faqList || []);
+        if (chosen) return { item: chosen, score: 999, reason: 'high_priority' };
+      }
+    } catch {}
+  }
+
+  // 1) Score all items
+  let best = null;
+  for (let i = 0; i < (faqList || []).length; i++) {
+    const item = faqList[i];
+    const bias = Math.max(0, 2 - Math.floor(i/100)); // tiny earlier-is-better bias
+    const s = scoreCandidate(q, item, bias);
+
+    if (!best || s > best.score) {
+      best = { item, score: s };
+    }
+  }
+
+  // 2) Thresholds: avoid spurious matches
+  if (!best || best.score < 20) return null; // too weak, let fallback handle
+
+  return best;
+}
+
+function handleFaq(match) {
+  if (!match || !match.item) return null;
   return {
     type: 'answer',
-    text: (item.a || '').endsWith('\n') ? item.a : (item.a || '') + '\n',
+    text: match.item.a,
     meta: {
-      matched_question: item.q,
-      source: item._src || item.source || item.src,
-      score: typeof score === 'number' ? +score.toFixed(3) : undefined,
-      candidates // beholdes i API bare når trace=1 (se /api/assist.js)
+      matched_question: match.item.q,
+      related: [],
+      source: match.item._src
     }
   };
 }
 
-module.exports = { detectFaq, handleFaq };
+module.exports = {
+  detectFaq,
+  handleFaq,
+};
