@@ -3,25 +3,23 @@ faq:
   # --------------- VHS / VIDEO ---------------
 
   - id: vhs-pris
-    q: Hvor mye koster det å digitalisere en VHS-kassett?
+    q: "Hvor mye koster det å digitalisere en VHS-kassett?"
     alt:
-      - pris vhs
-      - hva koster digitalisering av videokassett
-      - digitalisere vhs pris
-      - vhs til usb pris
-      - kostnad vhs overføring
-      - pris per time vhs
-      - videobånd til mp4 pris
-      - digitalisere videokassetter pris
-      - pris på overføring av vhs
-      - hva koster video digitalisering
-      - hva koster å digitalisere video
-      - pris digitalisering video
-      - kostnad digitalisering video
+      - "pris vhs"
+      - "hva koster digitalisering av videokassett"
+      - "digitalisere vhs pris"
+      - "vhs til usb pris"
+      - "kostnad vhs overføring"
+      - "pris per time vhs"
+      - "videobånd til mp4 pris"
+      - "digitalisere videokassetter pris"
+      - "pris på overføring av vhs"
+      - "hva koster video digitalisering"
+      - "hva koster å digitalisere video"
+      - "pris digitalisering video"
+      - "kostnad digitalisering video"
       - "digitalisering av video"
       - "pris video"
-      - "hva koster å digitalisere video"
-      - "video digitalisering pris"
       - "hva koster vhs digitalisering"
       - "kostnad digitalisering av vhs"
       - "digitalisere videobånd"
@@ -32,54 +30,54 @@ faq:
     tags: ["vhs", "video", "pris", "rabatt"]
 
   - id: vhs-leveringstid
-    q: Hvor lang tid tar det å digitalisere videokassetter?
+    q: "Hvor lang tid tar det å digitalisere videokassetter?"
     alt:
-      - leveringstid vhs
-      - når er kassettene klare
-      - hvor raskt får jeg videofilene
-      - hvor lang ventetid vhs
-      - digitalisere video hvor lenge
-      - når kan jeg hente vhs
-      - vhs overføring tid
-      - leveringstid videokassett
-      - gjennomløpstid vhs
-      - tid for digitalisering video
+      - "leveringstid vhs"
+      - "når er kassettene klare"
+      - "hvor raskt får jeg videofilene"
+      - "hvor lang ventetid vhs"
+      - "digitalisere video hvor lenge"
+      - "når kan jeg hente vhs"
+      - "vhs overføring tid"
+      - "leveringstid videokassett"
+      - "gjennomløpstid vhs"
+      - "tid for digitalisering video"
     a: >
       Normalt 4–14 dager, maks 3 uker.
       Kontakt oss gjerne på telefon eller e-post for en rask vurdering og mer presist tidsestimat.
     tags: ["vhs", "leveringstid"]
 
   - id: vhs-formater
-    q: Tar dere VHS-C, Video8/Hi8 og MiniDV?
+    q: "Tar dere VHS-C, Video8/Hi8 og MiniDV?"
     alt:
-      - digitaliserer dere hi8
-      - kan dere ta minidv
-      - vhs-c mulig
-      - tar dere video8
-      - camcorderbånd digitalisering
-      - små videokassetter digitalisering
-      - mini dv kassetter
-      - 8mm video til fil
-      - digitalisere hi8 og minidv
-      - digitalisering av camcorder-tape
+      - "digitaliserer dere hi8"
+      - "kan dere ta minidv"
+      - "vhs-c mulig"
+      - "tar dere video8"
+      - "camcorderbånd digitalisering"
+      - "små videokassetter digitalisering"
+      - "mini dv kassetter"
+      - "8mm video til fil"
+      - "digitalisere hi8 og minidv"
+      - "digitalisering av camcorder-tape"
     a: >
       Ja. Vi tar VHS/VHS-C, Video8/Hi8, MiniDV m.fl.
       Ta kontakt på telefon eller e-post, så vurderer vi omfanget og gir et prisestimat/tilbud.
     tags: ["vhs", "vhs-c", "video8", "hi8", "minidv", "formater"]
 
   - id: vhs-kvalitetsforbedring
-    q: Kan dere forbedre kvaliteten på video?
+    q: "Kan dere forbedre kvaliteten på video?"
     alt:
-      - blir kvaliteten bedre
-      - støyreduksjon vhs
-      - stabilisering og fargekorrigering
-      - kan dere rense opp video
-      - fjerne skurr fra vhs
-      - bedre bilde fra gamle vhs
-      - oppskalere video
-      - forbedre skurrete opptak
-      - bedre farger på video
-      - gjøre vhs penere
+      - "blir kvaliteten bedre"
+      - "støyreduksjon vhs"
+      - "stabilisering og fargekorrigering"
+      - "kan dere rense opp video"
+      - "fjerne skurr fra vhs"
+      - "bedre bilde fra gamle vhs"
+      - "oppskalere video"
+      - "forbedre skurrete opptak"
+      - "bedre farger på video"
+      - "gjøre vhs penere"
     a: |
       Ja. Vi justerer farger/kontrast, stabiliserer og reduserer skurr der det er mulig.
       Oppskalering til HD kan gjøres ved behov (med KI-verktøy), men vi bevarer alltid en tro kopi av originalen.
@@ -87,18 +85,18 @@ faq:
     tags: ["vhs", "kvalitet", "oppskalering"]
 
   - id: vhs-samle-pa-usb
-    q: Kan dere legge flere kassetter på én minnepenn?
+    q: "Kan dere legge flere kassetter på én minnepenn?"
     alt:
-      - alt på samme minnepenn
-      - samle alle filer ett sted
-      - en minnepenn for alt
-      - alt på en usb
-      - får jeg alle videoene samlet
-      - slå sammen på minnepenn
-      - en stick for alle kassetter
-      - alt på en disk
-      - samle alle vhs på usb
-      - kan dere samle filene
+      - "alt på samme minnepenn"
+      - "samle alle filer ett sted"
+      - "en minnepenn for alt"
+      - "alt på en usb"
+      - "får jeg alle videoene samlet"
+      - "slå sammen på minnepenn"
+      - "en stick for alle kassetter"
+      - "alt på en disk"
+      - "samle alle vhs på usb"
+      - "kan dere samle filene"
     a: |
       Ja. Vi kan samle alle filer på én USB. Vi har minnepenner opptil 2 TB, som kan romme hundrevis av timer opptak.
       Merk at mange TV-er krever FAT32 (MS-DOS), som har 4 GB filgrense – lange opptak deles da i flere filer.
@@ -106,35 +104,37 @@ faq:
     tags: ["vhs", "leveranse", "usb", "fat32"]
 
   - id: vhs-rydde-opptak
-    q: Hva gjør dere med skurr/blå skjerm og pauser?
+    q: "Hva gjør dere med skurr/blå skjerm og pauser?"
     alt:
-      - fjerner dere blanke partier
-      - klipper dere bort tomrom
-      - håndtering av pauser
-      - redigerer dere bort ingenting
-      - kan dere fjerne opptak uten innhold
-      - rydder dere i opptaket
-      - tar dere bort skurr
-      - blå skjerm fjernes
-      - pauser kuttes
-      - tar dere vekk ubrukelig opptak
+      - "fjerner dere blanke partier"
+      - "klipper dere bort tomrom"
+      - "håndtering av pauser"
+      - "redigerer dere bort ingenting"
+      - "kan dere fjerne opptak uten innhold"
+      - "rydder dere i opptaket"
+      - "tar dere bort skurr"
+      - "blå skjerm fjernes"
+      - "pauser kuttes"
+      - "tar dere vekk ubrukelig opptak"
     a: >
       Vi rydder opp og fjerner skurr, blå sekvenser og partier uten meningsfullt lyd- eller bildeinnhold.
     tags: ["vhs", "redigering", "opprydding"]
 
   - id: vhs-reparasjon
-    q: Reparerer dere kassetter?
+    q: "Reparerer dere kassetter?"
     alt:
-      - reparere vhs
-      - kan dere fikse kassett
-      - båndet er røket
-      - ødelagt kassetthus
-      - snappet bånd
-      - skjøte videobånd
-      - reparere minidv
-      - fikse video8/hi8
-      - manglende tapp
-      - skifte hus på kassett
+      - "reparere kassetter"
+      - "reparere vhs"
+      - "skjøte videobånd"
+      - "båndet er røket"
+      - "ødelagt kassetthus"
+      - "snappet bånd"
+      - "reparere minidv"
+      - "fikse video8"
+      - "fikse hi8"
+      - "manglende tapp"
+      - "skifte hus på kassett"
+      - "kassettreparasjon"
     a: |
       Ja. Vi kan skjøte røket bånd og/eller flytte innholdet over i nytt kassetthus før digitalisering.
       Enkle reparasjoner gjør vi som del av oppdraget – større arbeid avtales på forhånd.
@@ -142,32 +142,29 @@ faq:
     tags: ["vhs", "video", "reparasjon", "tjenester"]
 
   - id: vhs-formater-utvidet
-    q: Tar dere også Betamax og andre formater?
+    q: "Tar dere også Betamax og andre formater?"
     alt:
-      - betamax digitalisering
-      - umatic digitalisering
-      - u-matic digitalisering
-      - digitalisere betamax
-      - digitalisere u-matic
-      - v2000 format
-      - s-vhs digitalisering
-      - andre videobånd formater
+      - "betamax digitalisering"
+      - "umatic digitalisering"
+      - "u-matic digitalisering"
+      - "digitalisere betamax"
+      - "digitalisere u-matic"
+      - "v2000 format"
+      - "s-vhs digitalisering"
+      - "andre videobånd formater"
     a: >
       Vi tar de vanligste formatene (VHS/VHS-C, Video8/Hi8, MiniDV m.fl.).
       Betamax og enkelte spesialformater kan vi løse etter vurdering.
       Send gjerne utfyllende info til kontakt@lunamedia.no – legg gjerne ved bilde av kassetten(e).
     tags: ["vhs", "formater", "praktisk"]
 
-    
-    - id: video-tilbyr
-  q: "Digitaliserer dere video?"
-  alt:
-    - "digitaliserer dere vhs"
-    - "digitaliserer dere videokassetter"
-    - "kan dere digitalisere video"
-    - "video til mp4"
-    - "overføre video til fil"
-  a: "Ja. Vi digitaliserer VHS/VHS-C, Video8/Hi8, MiniDV m.fl. – levert som MP4 (USB/nedlasting) eller på forespørsel ProRes/MOV."
-  tags: ["vhs","video","tjenester"]
-
-
+  - id: video-tilbyr
+    q: "Digitaliserer dere video?"
+    alt:
+      - "digitaliserer dere vhs"
+      - "digitaliserer dere videokassetter"
+      - "kan dere digitalisere video"
+      - "video til mp4"
+      - "overføre video til fil"
+    a: "Ja. Vi digitaliserer VHS/VHS-C, Video8/Hi8, MiniDV m.fl. – levert som MP4 (USB/nedlasting) eller på forespørsel ProRes/MOV."
+    tags: ["vhs", "video", "tjenester"]
