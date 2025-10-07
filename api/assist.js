@@ -108,33 +108,35 @@ module.exports = async (req, res) => {
     if (req.method !== 'POST')
       return res.status(405).json({ error: 'Method not allowed' });
 
-    // POST = chat
-    let body = req.body;
-    if (typeof body === 'string') {
-      try { body = JSON.parse(body); } catch { body = {}; }
-    }
+// POST = chat
+let body = req.body;
+if (typeof body === 'string') {
+  try { body = JSON.parse(body); } catch { body = {}; }
+}
 
-    const text  = (body?.message || body?.text || '').trim();
-    const trace = (req.query && (req.query.trace === '1' || req.query.trace === 'true')) || !!body?.trace;
-    if (!text) return res.status(400).json({ error: 'Missing message' });
+const text    = (body?.message || body?.text || '').trim();
+const history = Array.isArray(body?.history) ? body.history : []; // ✅ NYTT
+const trace   = (req.query && (req.query.trace === '1' || req.query.trace === 'true')) || !!body?.trace;
 
-    const result = await getAssistant().handle({ text });
+if (!text) return res.status(400).json({ error: 'Missing message' });
 
-    if (result && typeof result.text === 'string') {
-      let meta = result.meta || null;
-      if (meta && !trace && meta.candidates) {
-        const { candidates, ...rest } = meta;
-        meta = rest;
-      }
-      return res.status(200).json({
-        ok: true,
-        answer: result.text,
-        text: result.text,
-        suggestion: result.suggestion || null,  // ✅ ny
-        meta,
-        source: result.type || 'answer'
-      });
-    }
+const result = await getAssistant().handle({ text, history }); // ✅ send med history
+
+if (result && typeof result.text === 'string') {
+  let meta = result.meta || null;
+  if (meta && !trace && meta.candidates) {
+    const { candidates, ...rest } = meta;
+    meta = rest;
+  }
+  return res.status(200).json({
+    ok: true,
+    answer: result.text,
+    text: result.text,
+    suggestion: result.suggestion || null,
+    meta,
+    source: result.type || 'answer'
+  });
+}
 
     return res.status(200).json({
       ok: true,
