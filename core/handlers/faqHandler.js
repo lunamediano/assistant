@@ -1,7 +1,4 @@
 // core/handlers/faqHandler.js
-const { loadKnowledge } = require('../../data/loadData');
-
-// --- utils ---
 function norm(s) {
   return (s || '')
     .toLowerCase()
@@ -10,124 +7,70 @@ function norm(s) {
     .replace(/\s+/g, ' ')
     .trim();
 }
-function tokens(s) {
-  return norm(s).split(' ').filter(Boolean);
-}
-function containsPhrase(hay, needle) {
-  return norm(hay).includes(norm(needle));
-}
-function anyContains(hay, arr) {
-  const h = norm(hay);
-  return arr.some(p => h.includes(norm(p)));
+
+function tokenize(s) {
+  return new Set(norm(s).split(' ').filter(Boolean));
 }
 
-// Formatord for hinting/penalty
-const VIDEO_WORDS   = ['vhs','video','minidv','mini dv','video8','hi8','digital8','vhs c','camcorder'];
-const SMALFILM_WORDS= ['smalfilm','super 8','super8','8mm','8 mm','16mm','16 mm'];
-
-const HIGH_PRIORITY_RULES = [
-  // Q: "Hva tilbyr dere?"
-  {
-    when: (q) => anyContains(q, ['hva tilbyr dere','hva gjør dere','hvilke tjenester']),
-    pick: (faq) => faq.find(x => x.id === 'intro-tjenester')
-  },
-];
-
-function scoreCandidate(query, item, idxOrderBias = 0) {
-  // Base materials
-  const qn = norm(query);
-  const qtoks = tokens(query);
-  const fields = [item.q, ...(item.alt || [])].map(norm).filter(Boolean);
-
-  let score = 0;
-
-  // 1) Exact phrase hits (on q or any alt)
-  for (const f of fields) {
-    if (qn === f) score += 120;
-    if (f.includes(qn)) score += 80; // query as substring of field
-    if (qn.includes(f) && f.length > 6) score += 40; // field is contained in query (avoid tiny words)
-  }
-
-  // 2) Token overlap: +6 per shared token (diminishing)
-  for (const t of qtoks) {
-    if (!t) continue;
-    if (fields.some(f => f.split(' ').includes(t))) score += 6;
-    else if (fields.some(f => f.includes(t))) score += 2;
-  }
-
-  // 3) Format boosting / penalty
-  const mentionsVideo    = anyContains(query, VIDEO_WORDS);
-  const mentionsSmalfilm = anyContains(query, SMALFILM_WORDS);
-
-  const isVideoFaq = (item.tags || []).includes('vhs') || (item.tags || []).includes('video');
-  const isSmalFaq  = (item.tags || []).includes('smalfilm');
-
-  if (mentionsVideo && isVideoFaq) score += 40;
-  if (mentionsSmalfilm && isSmalFaq) score += 40;
-
-  // Penalize cross-domain confusion when user is explicit
-  if (mentionsVideo && isSmalFaq && !isVideoFaq) score -= 35;
-  if (mentionsSmalfilm && isVideoFaq && !isSmalFaq) score -= 35;
-
-  // 4) Light boost for very short queries that contain a clear domain word
-  if (qtoks.length <= 4) {
-    if (mentionsVideo && isVideoFaq) score += 10;
-    if (mentionsSmalfilm && isSmalFaq) score += 10;
-  }
-
-  // 5) Tie-breaker: prefer earlier files (round1 first) via tiny bias
-  score += idxOrderBias;
-
-  return score;
+function overlapScore(aTokens, bTokens) {
+  let hits = 0;
+  for (const t of aTokens) if (bTokens.has(t)) hits++;
+  return hits;
 }
 
-// Public API used by /core
-function detectFaq(userText, faqList) {
-  const q = userText || '';
-  if (!q.trim()) return null;
-
-  // 0) High-priority explicit picks
-  for (const rule of HIGH_PRIORITY_RULES) {
-    try {
-      if (rule.when(q)) {
-        const chosen = rule.pick(faqList || []);
-        if (chosen) return { item: chosen, score: 999, reason: 'high_priority' };
-      }
-    } catch {}
-  }
-
-  // 1) Score all items
+/**
+ * Finn beste FAQ-treff.
+ * opts.topicHint kan være 'video' | 'vhs' | 'smalfilm' | 'foto'
+ */
+function detectFaq(userText, allFaq, opts = {}) {
+  const qTokens = tokenize(userText);
   let best = null;
-  for (let i = 0; i < (faqList || []).length; i++) {
-    const item = faqList[i];
-    const bias = Math.max(0, 2 - Math.floor(i/100)); // tiny earlier-is-better bias
-    const s = scoreCandidate(q, item, bias);
+  let bestScore = 0;
 
-    if (!best || s > best.score) {
-      best = { item, score: s };
+  for (const f of allFaq) {
+    const candTexts = [f.q, ...(Array.isArray(f.alt) ? f.alt : [])].filter(Boolean);
+    let candScore = 0;
+
+    for (const t of candTexts) {
+      candScore = Math.max(candScore, overlapScore(qTokens, tokenize(t)));
+    }
+
+    // Boost for eksakt ord (“pris”, “kostnad”) + kort spm
+    if (/^hva koster det\??$/.test(norm(userText))) candScore += 1;
+
+    // Topic-boost
+    const tags = Array.isArray(f.tags) ? f.tags.map(norm) : [];
+    const idn  = norm(f.id || '');
+    const topic = norm(opts.topicHint || '');
+    if (topic) {
+      if (tags.includes(topic)) candScore += 3;
+      if (topic === 'video' && (tags.includes('vhs') || tags.includes('minidv') || tags.includes('hi8'))) candScore += 2;
+      if (topic === 'vhs' && tags.includes('video')) candScore += 2;
+      if (topic === 'smalfilm' && (tags.includes('super8') || tags.includes('8mm') || tags.includes('16mm'))) candScore += 2;
+      if (topic && idn.startsWith(topic)) candScore += 1;
+    }
+
+    if (candScore > bestScore) {
+      bestScore = candScore;
+      best = f;
     }
   }
 
-  // 2) Thresholds: avoid spurious matches
-  if (!best || best.score < 20) return null; // too weak, let fallback handle
-
+  // veldig lav score? ingen klare treff
+  if (!best || bestScore === 0) return null;
   return best;
 }
 
-function handleFaq(match) {
-  if (!match || !match.item) return null;
+function handleFaq(faqItem) {
   return {
     type: 'answer',
-    text: match.item.a,
+    text: faqItem.a,
     meta: {
-      matched_question: match.item.q,
-      related: [],
-      source: match.item._src
+      id: faqItem.id,
+      tags: faqItem.tags || [],
+      src: faqItem._src || faqItem.source || faqItem.src || null
     }
   };
 }
 
-module.exports = {
-  detectFaq,
-  handleFaq,
-};
+module.exports = { detectFaq, handleFaq };
