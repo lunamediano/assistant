@@ -15,6 +15,20 @@ function has(text, ...needles) {
 }
 
 function detectCompanyIntent(text) {
+  // Tjenester / "Hva tilbyr dere?"
+  if (has(
+    text,
+    'hva tilbyr dere',
+    'hvilke tjenester',
+    'hvilke tjenester tilbyr dere',
+    'hva gjør dere',
+    'hva kan dere hjelpe med',
+    'tjenester luna media',
+    'hva slags tjenester'
+  )) {
+    return 'company_services';
+  }
+
   // Adresse / levering til sted
   if (has(
     text,
@@ -40,18 +54,19 @@ function detectCompanyIntent(text) {
     return 'company_email';
   }
 
-  // Leveringstid (praktisk/turnaround)
+  // Leveringstid (praktisk)
   if (has(text, 'leveringstid', 'hvor lang tid', 'tar det lang tid å få ferdig', 'må jeg vente lenge', 'når ferdig')) {
     return 'company_delivery';
   }
 
-  // Henting/levering (pickup/bring/utkjøring)
+  // Henting/levering (lokal logistikk)
   if (has(
     text,
-    'henting', 'henter dere', 'kan dere hente', 'hente hos meg', 'hent og bring',
-    'leverer dere', 'levering hjemme', 'utkjøring', 'bud', 'transport', 'hente/levere'
+    'henter dere', 'henting', 'leverer dere', 'levering',
+    'kan dere hente', 'kan dere levere', 'hent og lever',
+    'hent/lever', 'hente levert', 'hjemhenting'
   )) {
-    return 'company_pickup';
+    return 'company_pickup_delivery';
   }
 
   return null;
@@ -61,16 +76,41 @@ function handleCompanyIntent(intent, meta) {
   if (!meta || !meta.company) return null;
   const c = meta.company;
   const d = meta.delivery || {};
+  const services = Array.isArray(meta.services) ? meta.services : [];
 
   switch (intent) {
+    case 'company_services': {
+      if (services.length > 0) {
+        const bullets = services
+          .map(s => `• ${s.navn}${s.beskrivelse ? ` – ${s.beskrivelse}` : ''}`)
+          .join('\n');
+        return {
+          type: 'answer',
+          text:
+            `Vi tilbyr:\n${bullets}\n\n` +
+            `Vil du at vi sender et uforpliktende estimat/tilbud?`,
+          meta: { source: c._source }
+        };
+      }
+      // Fallback hvis services mangler i meta
+      return {
+        type: 'answer',
+        text:
+          `Vi digitaliserer video (VHS, Video8/Hi8, MiniDV m.fl.), smalfilm (8 mm/Super 8/16 mm), ` +
+          `skanner foto/dias/negativer, tilbyr videoproduksjon (arrangement/bedrift), droneopptak og fotorestaurering. ` +
+          `Vil du ha et uforpliktende tilbud?`,
+        meta: { source: c._source }
+      };
+    }
+
     case 'company_address':
       return {
         type: 'answer',
         text:
-          `Om du ønsker, så kan du levere oppdrag til hos oss på:\n\n` +
+          `Du kan levere oppdrag hos oss på:\n\n` +
           (c.adresser?.tonsberg ? `• ${c.adresser.tonsberg}\n` : '') +
           (c.adresser?.oslo ? `• ${c.adresser.oslo}\n` : '') +
-          `\nVi tar også imot postforsendelser. Men ring oss gjerne, eller skriv en e-post, for å få et nøyaktig prisestimat, og/eller for å gjøre en avtale om innlevering av materiale.`,
+          `\nVi tar også imot postforsendelser. Ring eller send e-post om du vil avtale innlevering og/eller få et prisestimat.`,
         meta: { source: c._source }
       };
 
@@ -100,15 +140,12 @@ function handleCompanyIntent(intent, meta) {
         meta: { source: d._source || c._source }
       };
 
-    case 'company_pickup':
+    case 'company_pickup_delivery':
       return {
         type: 'answer',
         text:
           `Vi henter og leverer materiale i Vestfold. Fra andre steder i landet har vi andre løsninger. ` +
-          `Vennligst ta kontakt på telefon ${c.telefon || ''}`.trim() +
-          `${c.telefon && c.epost ? ' eller ' : ''}` +
-          `${c.epost ? `e-post ${c.epost}` : ''}` +
-          ` for å gjøre en avtale.`,
+          `Vennligst ta kontakt på telefon eller e-post for å gjøre en avtale.`,
         meta: { source: c._source }
       };
 
