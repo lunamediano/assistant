@@ -22,94 +22,105 @@ function anyContains(hay, arr) {
 }
 
 // Formatord for hinting/penalty
-const VIDEO_WORDS   = ['vhs','video','minidv','mini dv','video8','hi8','digital8','vhs c','camcorder'];
-const SMALFILM_WORDS= ['smalfilm','super 8','super8','8mm','8 mm','16mm','16 mm'];
+const VIDEO_WORDS    = ['vhs','video','minidv','mini dv','video8','hi8','digital8','vhs c','camcorder'];
+const SMALFILM_WORDS = ['smalfilm','super 8','super8','8mm','8 mm','16mm','16 mm'];
 
-const HIGH_PRIORITY_RULES = [
-  // Q: "Hva tilbyr dere?"
-  {
-    when: (q) => anyContains(q, ['hva tilbyr dere','hva gjør dere','hvilke tjenester']),
-    pick: (faq) => faq.find(x => x.id === 'intro-tjenester')
-  },
+// ——— High-priority regler
+const SERVICE_QUERIES = [
+  'hva tilbyr dere',
+  'hvilke tjenester',
+  'hvilke tjenester tilbyr dere',
+  'hva gjør dere',
+  'hva kan dere hjelpe med',
+  'tjenester luna media',
+  'hva slags tjenester'
 ];
 
+function pickIntroServicesFaq(faqList) {
+  if (!Array.isArray(faqList)) return null;
+  // 1) Prøv eksakt id
+  let hit = faqList.find(x => x && x.id === 'intro-tjenester');
+  if (hit) return hit;
+  // 2) Prøv å finne i faq_round1.yml med “tjeneste” i spørsmålet
+  hit = faqList.find(x =>
+    x &&
+    typeof x.q === 'string' &&
+    (x._src || x.source || '').endsWith('faq_round1.yml') &&
+    norm(x.q).includes('tjeneste')
+  );
+  return hit || null;
+}
+
 function scoreCandidate(query, item, idxOrderBias = 0) {
-  // Base materials
   const qn = norm(query);
   const qtoks = tokens(query);
   const fields = [item.q, ...(item.alt || [])].map(norm).filter(Boolean);
 
   let score = 0;
 
-  // 1) Exact phrase hits (on q or any alt)
+  // 1) Eksakte/frase-treff
   for (const f of fields) {
     if (qn === f) score += 120;
-    if (f.includes(qn)) score += 80; // query as substring of field
-    if (qn.includes(f) && f.length > 6) score += 40; // field is contained in query (avoid tiny words)
+    if (f.includes(qn)) score += 80;            // query som substring i felt
+    if (qn.includes(f) && f.length > 6) score += 40; // felt inni query
   }
 
-  // 2) Token overlap: +6 per shared token (diminishing)
+  // 2) Token-overlapp
   for (const t of qtoks) {
     if (!t) continue;
     if (fields.some(f => f.split(' ').includes(t))) score += 6;
     else if (fields.some(f => f.includes(t))) score += 2;
   }
 
-  // 3) Format boosting / penalty
+  // 3) Domeneboost/straff
   const mentionsVideo    = anyContains(query, VIDEO_WORDS);
   const mentionsSmalfilm = anyContains(query, SMALFILM_WORDS);
 
-  const isVideoFaq = (item.tags || []).includes('vhs') || (item.tags || []).includes('video');
-  const isSmalFaq  = (item.tags || []).includes('smalfilm');
+  const tags = item.tags || [];
+  const isVideoFaq = tags.includes('vhs') || tags.includes('video');
+  const isSmalFaq  = tags.includes('smalfilm');
 
   if (mentionsVideo && isVideoFaq) score += 40;
   if (mentionsSmalfilm && isSmalFaq) score += 40;
 
-  // Penalize cross-domain confusion when user is explicit
   if (mentionsVideo && isSmalFaq && !isVideoFaq) score -= 35;
   if (mentionsSmalfilm && isVideoFaq && !isSmalFaq) score -= 35;
 
-  // 4) Light boost for very short queries that contain a clear domain word
+  // 4) Korte spørsmål → litt ekstra vekt hvis domenet matcher
   if (qtoks.length <= 4) {
     if (mentionsVideo && isVideoFaq) score += 10;
     if (mentionsSmalfilm && isSmalFaq) score += 10;
   }
 
-  // 5) Tie-breaker: prefer earlier files (round1 first) via tiny bias
+  // 5) Liten bias for tidligere filer (faq_round1 kommer typisk først)
   score += idxOrderBias;
 
   return score;
 }
 
-// Public API used by /core
+// Public API brukt av /core
 function detectFaq(userText, faqList) {
   const q = userText || '';
   if (!q.trim()) return null;
 
-  // 0) High-priority explicit picks
-  for (const rule of HIGH_PRIORITY_RULES) {
-    try {
-      if (rule.when(q)) {
-        const chosen = rule.pick(faqList || []);
-        if (chosen) return { item: chosen, score: 999, reason: 'high_priority' };
-      }
-    } catch {}
+  // High priority: “hva tilbyr dere” etc.
+  if (anyContains(q, SERVICE_QUERIES)) {
+    const chosen = pickIntroServicesFaq(faqList);
+    if (chosen) return { item: chosen, score: 999, reason: 'high_priority:intro-services' };
+    // fallthrough hvis ikke funnet, så scorer vi videre
   }
 
-  // 1) Score all items
+  // Score alle kandidater
   let best = null;
   for (let i = 0; i < (faqList || []).length; i++) {
     const item = faqList[i];
-    const bias = Math.max(0, 2 - Math.floor(i/100)); // tiny earlier-is-better bias
+    const bias = Math.max(0, 2 - Math.floor(i / 100)); // bitteliten "tidlig er bedre"
     const s = scoreCandidate(q, item, bias);
-
-    if (!best || s > best.score) {
-      best = { item, score: s };
-    }
+    if (!best || s > best.score) best = { item, score: s };
   }
 
-  // 2) Thresholds: avoid spurious matches
-  if (!best || best.score < 20) return null; // too weak, let fallback handle
+  // Minimumsterskel
+  if (!best || best.score < 20) return null;
 
   return best;
 }
