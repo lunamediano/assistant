@@ -2,60 +2,58 @@
 const { detectFaq, handleFaq } = require('./handlers/faqHandler');
 const { detectCompanyIntent, handleCompanyIntent } = require('./handlers/companyHandler');
 const { detectPriceIntent, handlePriceIntent } = require('./handlers/priceHandler');
-
-// Robust import: støtt både named og default
-const fb = require('./handlers/fallbackHandler');
-const fallbackHandler = fb.fallbackHandler || fb.default || fb;
-
+const { fallbackHandler } = require('./handlers/fallbackHandler');
 const { loadKnowledge } = require('../data/loadData');
 
-const DEBUG = (process.env.DEBUG_ASSISTANT || '').toLowerCase() === '1';
-
 function createAssistant() {
-  const data = loadKnowledge(); // last en gang
+  const data = loadKnowledge();
 
   return {
     async handle({ text }) {
-      const input = typeof text === 'string' ? text : '';
-      const lower = input.toLowerCase();
+      const lower = (text || '').toLowerCase();
 
-      try {
-        // 1) FAQ (nå med score + topK)
-        const faqMatch = detectFaq(lower, data.faq);
-        if (faqMatch) {
-          DEBUG && console.log('[route] faq ->', faqMatch.item.id || faqMatch.item.q, faqMatch.score);
-          const r = handleFaq(faqMatch);
-          if (r) return r;
+      // 0) Company først (fanger "Hva tilbyr dere?", åpningstider, adresse osv.)
+      const compIntent = detectCompanyIntent(lower);
+      if (compIntent) {
+        const r = handleCompanyIntent(compIntent, data.meta);
+        if (r) {
+          return {
+            ...r,
+            meta: { ...(r.meta || {}), route: 'company', intent: compIntent }
+          };
         }
+      }
 
-        // 2) Firma/praktisk
-        const compIntent = detectCompanyIntent(lower);
-        if (compIntent) {
-          DEBUG && console.log('[route] company ->', compIntent);
-          const r = handleCompanyIntent(compIntent, data.meta);
-          if (r) return r;
-        }
-
-        // 3) Pris/levering (nå med enkel kalkulator når tall oppgis)
-        const priceIntent = detectPriceIntent(lower);
-        if (priceIntent) {
-          DEBUG && console.log('[route] price ->', priceIntent);
-          const r = handlePriceIntent(priceIntent, data.meta, lower); // 👈 pass inn bruker-tekst
-          if (r) return r;
-        }
-
-        // 4) Fallback
-        DEBUG && console.log('[route] fallback');
-        return fallbackHandler(input);
-
-      } catch (err) {
-        console.error('[assistant] error:', err);
+      // 1) FAQ
+      const faqMatch = detectFaq(lower, data.faq);
+      if (faqMatch) {
+        const r = handleFaq(faqMatch);
         return {
-          type: 'answer',
-          text: 'Beklager, noe gikk galt på serveren. Prøv igjen om litt.',
-          error: String(err && err.message ? err.message : err)
+          ...r,
+          meta: {
+            ...(r.meta || {}),
+            route: 'faq',
+            id: faqMatch.id,
+            src: faqMatch._src || faqMatch.source
+          }
         };
       }
+
+      // 2) Pris
+      const priceIntent = detectPriceIntent(lower);
+      if (priceIntent) {
+        const r = handlePriceIntent(priceIntent, data.meta);
+        if (r) {
+          return {
+            ...r,
+            meta: { ...(r.meta || {}), route: 'price', intent: priceIntent }
+          };
+        }
+      }
+
+      // 3) Fallback
+      const r = fallbackHandler(text);
+      return { ...r, meta: { route: 'fallback' } };
     }
   };
 }
