@@ -26,25 +26,3 @@ faq:
     a: >
       Ja – send oss kort hva du har (f.eks. antall kassetter/ruller/minutter eller ca. antall bilder)
       og ønsket leveranse (USB/nedlasting/format). Vi svarer med et uforpliktende estimat/tilbud.
-
-   - id: intro-video-tilbyr
-    q: "Digitaliserer dere video?"
-    alt:
-      - "digitaliserer dere video"
-      - "digitaliserer dere video?"
-      - "digitaliserer dere vhs"
-      - "digitaliserer dere videokassetter"
-      - "video til mp4"
-      - "overføre video til fil"
-    a: "Ja. Vi digitaliserer VHS/VHS-C, Video8/Hi8, MiniDV m.fl. – levert som MP4 (USB/nedlasting) eller ProRes/MOV på forespørsel."
-
-  - id: intro-smalfilm-tilbyr
-    q: "Digitaliserer dere smalfilm?"
-    alt:
-      - "digitaliserer dere smalfilm"
-      - "digitaliserer dere smalfilm?"
-      - "smalfilm til digitalt"
-      - "8mm til mp4"
-      - "super8 til mp4"
-      - "16mm digitalisering"
-    a: "Ja. Vi digitaliserer 8 mm/Super 8/16 mm (med/uten lyd) – skannet i 4K med WetGate-rens for best mulig resultat."
