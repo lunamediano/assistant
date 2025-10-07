@@ -6,13 +6,19 @@ const { fallbackHandler } = require('./handlers/fallbackHandler');
 const { loadKnowledge } = require('../data/loadData');
 
 function createAssistant() {
+  // Last all kunnskap én gang ved cold start
   const data = loadKnowledge();
 
   return {
-    async handle({ text }) {
+    /**
+     * @param {object} args
+     * @param {string} args.text        Brukerens melding
+     * @param {Array}  [args.history]   Samtalehistorikk (array av {role, content} eller lign.)
+     */
+    async handle({ text, history = [] }) {
       const lower = (text || '').toLowerCase();
 
-      // 0) Company først (fanger "Hva tilbyr dere?", åpningstider, adresse osv.)
+      // 0) Firma / praktisk info først (fanger "Hva tilbyr dere?", åpningstider, adresse osv.)
       const compIntent = detectCompanyIntent(lower);
       if (compIntent) {
         const r = handleCompanyIntent(compIntent, data.meta);
@@ -24,7 +30,7 @@ function createAssistant() {
         }
       }
 
-      // 1) FAQ
+      // 1) FAQ – direkte treff mot kunnskapsbasen
       const faqMatch = detectFaq(lower, data.faq);
       if (faqMatch) {
         const r = handleFaq(faqMatch);
@@ -39,10 +45,10 @@ function createAssistant() {
         };
       }
 
-      // 2) Pris
-      const priceIntent = detectPriceIntent(lower);
+      // 2) Pris – kontekstsensitiv (bruker history for generiske spørsmål som "hva koster det?")
+      const priceIntent = detectPriceIntent(lower, history);
       if (priceIntent) {
-        const r = handlePriceIntent(priceIntent, data.meta);
+        const r = handlePriceIntent(priceIntent, data);
         if (r) {
           return {
             ...r,
