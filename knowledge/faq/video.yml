@@ -157,3 +157,17 @@ faq:
       Betamax og enkelte spesialformater kan vi løse etter vurdering.
       Send gjerne utfyllende info til kontakt@lunamedia.no – legg gjerne ved bilde av kassetten(e).
     tags: ["vhs", "formater", "praktisk"]
+
+    
+    - id: video-tilbyr
+  q: "Digitaliserer dere video?"
+  alt:
+    - "digitaliserer dere vhs"
+    - "digitaliserer dere videokassetter"
+    - "kan dere digitalisere video"
+    - "video til mp4"
+    - "overføre video til fil"
+  a: "Ja. Vi digitaliserer VHS/VHS-C, Video8/Hi8, MiniDV m.fl. – levert som MP4 (USB/nedlasting) eller på forespørsel ProRes/MOV."
+  tags: ["vhs","video","tjenester"]
+
+
