@@ -1,19 +1,21 @@
 // api/data/loadData.js
+// Laster og samler all kunnskap (FAQ, metadata) for assistenten.
+
 const fs = require('fs');
 const path = require('path');
-const fg = require('fast-glob');
 const YAML = require('js-yaml');
 const { KnowledgeDoc } = require('./schema');
 
-const KNOWLEDGE_DIR = path.join(__dirname, '..', 'knowledge'); // api/knowledge
-//
+const KNOWLEDGE_DIR = path.join(__dirname, '..', 'knowledge');
 
 function normalizeFaqItem(entry, file) {
   const q = entry.q || entry.question;
   const a = entry.a || entry.answer;
   const id = entry.id || `${path.basename(file)}:${(q || '').slice(0, 64)}`;
   return {
-    id, q, a,
+    id,
+    q,
+    a,
     alt: Array.isArray(entry.alt) ? entry.alt : [],
     tags: Array.isArray(entry.tags) ? entry.tags : [],
     _src: file
@@ -37,53 +39,30 @@ function mergeMeta(into, from, file) {
 }
 
 function loadKnowledge() {
-  const patterns = [
-    path.join(KNOWLEDGE_DIR, '**/*.y?(a)ml'),
-    '!' + path.join(KNOWLEDGE_DIR, '**/_*.y?(a)ml'),
-    '!' + path.join(KNOWLEDGE_DIR, '**/draft-*.y?(a)ml'),
-  ];
-  const files = fg.sync(patterns, { dot: false, onlyFiles: true }).sort();
+  // Bestemt lastrekkefølge — round1 først (generell), deretter temaer
+  const orderedFiles = [
+    'faq_round1.yml',
+    'faq/video.yml',
+    'faq/smalfilm.yml',
+    'faq/foto.yml',
+    'faq/pris.yml',
+    'faq/spesial.yml'
+  ].map(f => path.join(KNOWLEDGE_DIR, f));
 
   const allFaq = [];
   const byId = new Set();
   const byKey = new Set();
   const meta = {};
+  const loadedFiles = [];
 
-  for (const file of files) {
+  for (const file of orderedFiles) {
+    if (!fs.existsSync(file)) {
+      console.warn(`[Knowledge] Fil mangler: ${file}`);
+      continue;
+    }
+
     let raw;
     try {
       raw = fs.readFileSync(file, 'utf8');
     } catch (e) {
-      console.warn('[Knowledge] Kunne ikke lese', file, e.message);
-      continue;
-    }
-    let doc;
-    try {
-      doc = YAML.load(raw, { filename: file }) || {};
-    } catch (e) {
-      console.warn('[Knowledge] YAML-feil i', file, e.message);
-      continue;
-    }
-
-    const parsed = KnowledgeDoc.safeParse(doc);
-    if (!parsed.success) {
-      console.warn('[Knowledge] Skjemafeil i', file, parsed.error.issues);
-      continue;
-    }
-
-    for (const entry of parsed.data.faq || []) {
-      const item = normalizeFaqItem(entry, file);
-      const key = (item.q || '').trim().toLowerCase();
-      if (byId.has(item.id) || byKey.has(key)) continue;
-      byId.add(item.id);
-      byKey.add(key);
-      allFaq.push(item);
-    }
-
-    mergeMeta(meta, parsed.data, file);
-  }
-
-  return { faq: allFaq, meta, faqIndex: { files }, count: { faq: allFaq.length } };
-}
-
-module.exports = { loadKnowledge };
+      console.warn('[Knowledge] Kunne ikke lese', fil
