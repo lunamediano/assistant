@@ -1,6 +1,5 @@
-// build-bump: 2025-10-06T11:55Z
-
-// /api/assist.js  (CommonJS – health, debug og chat i én lambda)
+// api/assist.js
+// build-bump: 2025-10-07T12:05Z
 
 const { createAssistant } = require('../core');
 const { loadKnowledge }   = require('../data/loadData');
@@ -47,6 +46,12 @@ const dbg = {
       env: { ASSISTANT_MODE: mode || 'unset', USE_MODULAR_ASSISTANT: flag || 'unset' }
     };
   },
+  version: () => ({
+    ok: true,
+    build: '2025-10-07T12:05Z',
+    commit: process.env.VERCEL_GIT_COMMIT_SHA || 'local',
+    tag: process.env.VERCEL_GIT_COMMIT_REF || 'unknown'
+  }),
   which: () => {
     const hasCreate = typeof require('../core').createAssistant === 'function';
     return {
@@ -92,7 +97,7 @@ module.exports = async (req, res) => {
     setCors(req, res);
     if (req.method === 'OPTIONS') return res.status(204).end();
 
-    // GET = health eller debug (?fn=env|mode|which|knowledge|company)
+    // GET = health eller debug (?fn=env|mode|version|which|knowledge|company)
     if (req.method === 'GET') {
       const fn = (req.query && req.query.fn) || null;
       if (!fn) return res.status(200).json({ status: 'ok', time: new Date().toISOString() });
@@ -111,33 +116,31 @@ module.exports = async (req, res) => {
 
     const text  = (body?.message || body?.text || '').trim();
     const trace = (req.query && (req.query.trace === '1' || req.query.trace === 'true')) || !!body?.trace;
-
     if (!text) return res.status(400).json({ error: 'Missing message' });
 
     const result = await getAssistant().handle({ text });
 
     if (result && typeof result.text === 'string') {
-      // Skjul top-k kandidater fra meta hvis trace ikke er slått på
       let meta = result.meta || null;
       if (meta && !trace && meta.candidates) {
         const { candidates, ...rest } = meta;
         meta = rest;
       }
-
       return res.status(200).json({
         ok: true,
         answer: result.text,
         text: result.text,
+        suggestion: result.suggestion || null,  // ✅ ny
         meta,
         source: result.type || 'answer'
       });
     }
 
-    // fallback hvis resultatet ikke har tekst
     return res.status(200).json({
       ok: true,
       answer: 'Jeg er ikke helt sikker – kan du utdype litt?',
       text: 'Jeg er ikke helt sikker – kan du utdype litt?',
+      suggestion: 'Vil du beskrive hva du har (antall kassetter/ruller/bilder) – så gir jeg et kjapt estimat?',
       source: 'fallback'
     });
 
