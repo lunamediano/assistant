@@ -120,7 +120,9 @@ const trace   = (req.query && (req.query.trace === '1' || req.query.trace === 't
 
 if (!text) return res.status(400).json({ error: 'Missing message' });
 
-const result = await getAssistant().handle({ text, history }); // ✅ send med history
+// legg til støtte for historikk fra klient
+const history = Array.isArray(body?.history) ? body.history : [];
+const result = await getAssistant().handle({ text, history });
 
 if (result && typeof result.text === 'string') {
   let meta = result.meta || null;
