@@ -77,7 +77,7 @@ const dbg = {
   company: () => {
     try {
       const data = loadKnowledge();
-      return {
+    return {
         ok: true,
         hasCompany: !!data?.meta?.company,
         company: data?.meta?.company || null,
@@ -115,12 +115,12 @@ module.exports = async (req, res) => {
     }
 
     const text    = (body?.message || body?.text || '').trim();
-    const history = Array.isArray(body?.history) ? body.history : []; // ✅ tar imot historikk
+    const history = Array.isArray(body?.history) ? body.history : []; // tar imot historikk
     const trace   = (req.query && (req.query.trace === '1' || req.query.trace === 'true')) || !!body?.trace;
 
     if (!text) return res.status(400).json({ error: 'Missing message' });
 
-    // send videre historikk
+    // send videre historikk til kjernen
     const result = await getAssistant().handle({ text, history });
 
     if (result && typeof result.text === 'string') {
@@ -139,6 +139,7 @@ module.exports = async (req, res) => {
       });
     }
 
+    // fallback
     return res.status(200).json({
       ok: true,
       answer: 'Jeg er ikke helt sikker – kan du utdype litt?',
