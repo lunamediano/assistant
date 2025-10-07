@@ -1,5 +1,5 @@
 // api/assist.js
-// build-bump: 2025-10-07T12:05Z
+// build-bump: 2025-10-07T12:20Z
 
 const { createAssistant } = require('../core');
 const { loadKnowledge }   = require('../data/loadData');
@@ -48,7 +48,7 @@ const dbg = {
   },
   version: () => ({
     ok: true,
-    build: '2025-10-07T12:05Z',
+    build: '2025-10-07T12:20Z',
     commit: process.env.VERCEL_GIT_COMMIT_SHA || 'local',
     tag: process.env.VERCEL_GIT_COMMIT_REF || 'unknown'
   }),
@@ -108,37 +108,36 @@ module.exports = async (req, res) => {
     if (req.method !== 'POST')
       return res.status(405).json({ error: 'Method not allowed' });
 
-// POST = chat
-let body = req.body;
-if (typeof body === 'string') {
-  try { body = JSON.parse(body); } catch { body = {}; }
-}
+    // POST = chat
+    let body = req.body;
+    if (typeof body === 'string') {
+      try { body = JSON.parse(body); } catch { body = {}; }
+    }
 
-const text    = (body?.message || body?.text || '').trim();
-const history = Array.isArray(body?.history) ? body.history : []; // ✅ NYTT
-const trace   = (req.query && (req.query.trace === '1' || req.query.trace === 'true')) || !!body?.trace;
+    const text    = (body?.message || body?.text || '').trim();
+    const history = Array.isArray(body?.history) ? body.history : []; // ✅ tar imot historikk
+    const trace   = (req.query && (req.query.trace === '1' || req.query.trace === 'true')) || !!body?.trace;
 
-if (!text) return res.status(400).json({ error: 'Missing message' });
+    if (!text) return res.status(400).json({ error: 'Missing message' });
 
-// legg til støtte for historikk fra klient
-const history = Array.isArray(body?.history) ? body.history : [];
-const result = await getAssistant().handle({ text, history });
+    // send videre historikk
+    const result = await getAssistant().handle({ text, history });
 
-if (result && typeof result.text === 'string') {
-  let meta = result.meta || null;
-  if (meta && !trace && meta.candidates) {
-    const { candidates, ...rest } = meta;
-    meta = rest;
-  }
-  return res.status(200).json({
-    ok: true,
-    answer: result.text,
-    text: result.text,
-    suggestion: result.suggestion || null,
-    meta,
-    source: result.type || 'answer'
-  });
-}
+    if (result && typeof result.text === 'string') {
+      let meta = result.meta || null;
+      if (meta && !trace && meta.candidates) {
+        const { candidates, ...rest } = meta;
+        meta = rest;
+      }
+      return res.status(200).json({
+        ok: true,
+        answer: result.text,
+        text: result.text,
+        suggestion: result.suggestion || null,
+        meta,
+        source: result.type || 'answer'
+      });
+    }
 
     return res.status(200).json({
       ok: true,
