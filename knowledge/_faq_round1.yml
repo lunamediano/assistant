@@ -27,11 +27,12 @@ faq:
       Ja – send oss kort hva du har (f.eks. antall kassetter/ruller/minutter eller ca. antall bilder)
       og ønsket leveranse (USB/nedlasting/format). Vi svarer med et uforpliktende estimat/tilbud.
 
-  - id: intro-video-tilbyr
+   - id: intro-video-tilbyr
     q: "Digitaliserer dere video?"
     alt:
+      - "digitaliserer dere video"
+      - "digitaliserer dere video?"
       - "digitaliserer dere vhs"
-      - "kan dere digitalisere video"
       - "digitaliserer dere videokassetter"
       - "video til mp4"
       - "overføre video til fil"
@@ -40,7 +41,8 @@ faq:
   - id: intro-smalfilm-tilbyr
     q: "Digitaliserer dere smalfilm?"
     alt:
-      - "kan dere digitalisere smalfilm"
+      - "digitaliserer dere smalfilm"
+      - "digitaliserer dere smalfilm?"
       - "smalfilm til digitalt"
       - "8mm til mp4"
       - "super8 til mp4"
