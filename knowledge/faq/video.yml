@@ -50,6 +50,15 @@ faq:
   - id: vhs-formater
     q: "Tar dere VHS-C, Video8/Hi8 og MiniDV?"
     alt:
+      - "hvilke formater tar dere"
+      - "hvilke videoformater tar dere"
+      - "hvilke formater støtter dere"
+      - "formatliste video"
+      - "hvilke formater digitaliserer dere"
+      - "tar dere alle videoformater"
+      - "videokassett formater"
+      - "støttede videoformater"
+      - "format oversikt video"
       - "digitaliserer dere hi8"
       - "kan dere ta minidv"
       - "vhs-c mulig"
@@ -63,7 +72,7 @@ faq:
     a: >
       Ja. Vi tar VHS/VHS-C, Video8/Hi8, MiniDV m.fl.
       Ta kontakt på telefon eller e-post, så vurderer vi omfanget og gir et prisestimat/tilbud.
-    tags: ["vhs", "vhs-c", "video8", "hi8", "minidv", "formater"]
+    tags: ["vhs", "video", "formater", "vhs-c", "video8", "hi8", "minidv"]
 
   - id: vhs-kvalitetsforbedring
     q: "Kan dere forbedre kvaliteten på video?"
