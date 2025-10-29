@@ -1,57 +1,69 @@
 version: 1
 faq:
   # --------------- LEVERING / PRAKTISK ---------------
+
   - id: levering-hvor
     q: "Hvor kan jeg levere?"
     alt:
+      - "leveringsadresse"
+      - "hvor levere inn"
+      - "innlevering"
+      - "adresse til innlevering"
+      - "hvor holder dere til"
+      - "adresse sem"
       - "adresse oslo"
-      - "adresse tønsberg"
-      - "leveringssteder luna media"
-      - "kan jeg levere i oslo"
-      - "hvor levere i tønsberg"
-      - "leveringsadresse"
-      - "kontor i oslo eller tønsberg"
-      - "innlevering video oslo"
-      - "hvor kan jeg levere inn"
-      - "leveringsadresse"
-      - "innlevering hos dere"
+      - "innlevering bislett"
+      - "levering i tønsberg"
+      - "levering i oslo"
     a: |
-      Du kan levere hos oss på Sem Senteret (2. etg.), Andebuveien 3, 3170 Sem.
-      Vi har også en egen desk på Bislett i Oslo (etter avtale).
-      Vi tar i tillegg imot postforsendelser.
+      Du kan levere hos oss på **Sem Senteret (2. etg.), Andebuveien 3, 3170 Sem**.
+      Vi har også en **desk på Bislett i Oslo** (levering/henting **etter avtale**).
+      Vi tar i tillegg imot **postforsendelser**.
     tags: ["levering", "praktisk", "adresse", "oslo", "tønsberg"]
+    boost: 0.7
 
   - id: levering-avtale
     q: "Må jeg avtale tid før levering og henting?"
     alt:
-      - "åpningstider"
-      - "kan jeg komme når som helst"
-      - "booking av levering"
-      - "må jeg ringe først"
-      - "trenger jeg avtale tid"
+      - "må jeg avtale først"
+      - "kan jeg komme uten avtale"
+      - "avtale levering"
+      - "avtale henting"
       - "når har dere åpent"
-      - "henting avtale"
-      - "besøke uten avtale"
-      - "åpent i dag"
-      - "timebestilling levering"
+      - "åpningstider for levering"
+      - "hente tid"
     a: |
-      Ring gjerne på forhånd.
-      Våre åpningstider er mandag–fredag kl. 10–16 (torsdag til kl. 18).
+      **Ring gjerne på forhånd.** Våre åpningstider er **man–fre 10–16** (torsdag til **18**).
+      Vi avtaler gjerne et tidspunkt som passer.
     tags: ["levering", "praktisk", "åpningstider", "henting"]
+    boost: 0.7
 
   - id: levering-post
     q: "Kan dere sende filer/minnepenn i posten?"
     alt:
       - "postforsendelse"
-      - "kan dere sende minnepenn"
-      - "frakt og retur"
-      - "kan jeg få sendt filene"
-      - "sender dere i posten"
-      - "levering via post"
       - "retur i posten"
-      - "sende usb hjem"
-      - "post med sporing"
-      - "kan dere sende alt hjem"
+      - "sende usb"
+      - "kan dere sende tilbake"
+      - "frakt og retur"
+      - "norgespakke"
+      - "retur med sporing"
     a: |
-      Ja. Vi sender gjerne filer eller minnepenner i posten.
-      Vi bruker Norgesp
+      Ja. Vi sender **minnepenn/bilder/film** tilbake med **Norgespakke (sporing)**.
+      Gi beskjed om du ønsker **nedlasting** i stedet for fysisk minnepenn.
+    tags: ["levering", "post", "retur", "frakt"]
+    boost: 0.7
+
+  - id: levering-henting-vestfold
+    q: "Henter og leverer dere?"
+    alt:
+      - "kan dere hente"
+      - "henting og levering"
+      - "hente hos meg"
+      - "levering hjem"
+      - "budtjeneste"
+    a: |
+      Vi **henter og leverer i Vestfold**. Fra andre steder i landet finner vi løsninger.
+      Kontakt oss på **telefon eller e-post** for å avtale.
+    tags: ["levering", "henting", "praktisk", "vestfold"]
+    boost: 0.7
