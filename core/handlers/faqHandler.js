@@ -1,4 +1,5 @@
 // core/handlers/faqHandler.js
+
 function norm(s) {
   return (s || '')
     .toLowerCase()
@@ -8,69 +9,111 @@ function norm(s) {
     .trim();
 }
 
-function tokenize(s) {
-  return new Set(norm(s).split(' ').filter(Boolean));
+function contains(hay, needle) {
+  return norm(hay).includes(norm(needle));
 }
 
-function overlapScore(aTokens, bTokens) {
-  let hits = 0;
-  for (const t of aTokens) if (bTokens.has(t)) hits++;
-  return hits;
+function anyContains(hay, list = []) {
+  return (list || []).some(x => contains(hay, x));
 }
 
-/**
- * Finn beste FAQ-treff.
- * opts.topicHint kan være 'video' | 'vhs' | 'smalfilm' | 'foto'
- */
-function detectFaq(userText, allFaq, opts = {}) {
-  const qTokens = tokenize(userText);
+// Nøkkelordfamilier for kraftig disambiguering
+const K = {
+  video: /(vhs|videokassett|videobånd|videoband|video8|hi8|minidv|mini dv|digital8|video)\b/i,
+  smalfilm: /(smalfilm|super ?8|8mm|8 mm|16mm|16 mm)\b/i,
+  foto: /(foto|bilde|bilder|dias|lysbild|negativ)\b/i
+};
+
+function scoreItem(userText, item, opts = {}) {
+  const t = userText;
+  const q = item.q || '';
+  const alts = Array.isArray(item.alt) ? item.alt : [];
+  const tags = Array.isArray(item.tags) ? item.tags : [];
+
+  let score = 0;
+
+  // 1) Eksakte undertreffer på q/alt
+  if (contains(t, q)) score += 60;
+  if (anyContains(t, alts)) score += 45;
+
+  // 2) Enkle token-overlapp (pris, kostnad, digitalisere, etc.)
+  const tokens = norm(t).split(' ').filter(Boolean);
+  const hay = norm([q, ...(alts || [])].join(' '));
+  const overlap = tokens.filter(w => hay.includes(` ${w} `)).length;
+  score += Math.min(overlap * 3, 30);
+
+  // 3) Topic-hint fra historikk/forrige svar
+  const topicHint = opts.topicHint || null;
+  if (topicHint && tags.includes(topicHint)) score += 25;
+
+  // 4) Aggressive domene-booster/dempere
+  const itemHayRaw = [q, ...(alts || []), ...(tags || [])].join(' ');
+  const itemHay = itemHayRaw.toLowerCase();
+
+  const textVideo = K.video.test(t);
+  const textSmal  = K.smalfilm.test(t);
+  const textFoto  = K.foto.test(t);
+
+  const itemVideo = /vhs|videokassett|videobånd|video8|hi8|minidv|digital8|video\b/i.test(itemHay);
+  const itemSmal  = /smalfilm|super ?8|8mm|16 ?mm\b/i.test(itemHay);
+  const itemFoto  = /foto|bilde|dias|negativ\b/i.test(itemHay);
+
+  // Hvis brukeren sier "VHS / video", boost video-FAQ og demp smalfilm
+  if (textVideo) {
+    if (itemVideo) score += 80;
+    if (itemSmal)  score -= 35;
+  }
+  // Hvis brukeren sier "smalfilm", boost smalfilm og demp video
+  if (textSmal) {
+    if (itemSmal)  score += 80;
+    if (itemVideo) score -= 35;
+  }
+  // Hvis brukeren sier "foto/bilder", boost foto
+  if (textFoto && itemFoto) score += 60;
+
+  // 5) Pris-spesifikk finjustering
+  const askingPrice = /\b(hva\s+koster|pris|kostnad|hvor mye)\b/i.test(t);
+  if (askingPrice) {
+    if (/pris|kostnad/.test(itemHay)) score += 15;
+    // Vektlegg at pris-svar også tilhører korrekt domene
+    if (textVideo && itemVideo) score += 25;
+    if (textSmal && itemSmal)   score += 25;
+    if (textFoto && itemFoto)   score += 25;
+  }
+
+  return score;
+}
+
+function detectFaq(userText, faqItems, opts = {}) {
+  if (!userText || !faqItems || !faqItems.length) return null;
+
   let best = null;
-  let bestScore = 0;
+  let bestScore = -1;
+  const candidates = [];
 
-  for (const f of allFaq) {
-    const candTexts = [f.q, ...(Array.isArray(f.alt) ? f.alt : [])].filter(Boolean);
-    let candScore = 0;
-
-    for (const t of candTexts) {
-      candScore = Math.max(candScore, overlapScore(qTokens, tokenize(t)));
-    }
-
-    // Boost for eksakt ord (“pris”, “kostnad”) + kort spm
-    if (/^hva koster det\??$/.test(norm(userText))) candScore += 1;
-
-    // Topic-boost
-    const tags = Array.isArray(f.tags) ? f.tags.map(norm) : [];
-    const idn  = norm(f.id || '');
-    const topic = norm(opts.topicHint || '');
-    if (topic) {
-      if (tags.includes(topic)) candScore += 3;
-      if (topic === 'video' && (tags.includes('vhs') || tags.includes('minidv') || tags.includes('hi8'))) candScore += 2;
-      if (topic === 'vhs' && tags.includes('video')) candScore += 2;
-      if (topic === 'smalfilm' && (tags.includes('super8') || tags.includes('8mm') || tags.includes('16mm'))) candScore += 2;
-      if (topic && idn.startsWith(topic)) candScore += 1;
-    }
-
-    if (candScore > bestScore) {
-      bestScore = candScore;
-      best = f;
+  for (const item of faqItems) {
+    const s = scoreItem(userText, item, opts);
+    candidates.push({ id: item.id, score: s, _src: item._src, q: item.q });
+    if (s > bestScore) {
+      bestScore = s;
+      best = item;
     }
   }
 
-  // veldig lav score? ingen klare treff
-  if (!best || bestScore === 0) return null;
+  // Terskel for å akseptere svar
+  if (bestScore < 25) return null;
+
+  // Legg ved sporingsdata når trace=1
+  best._debug = { bestScore, candidates: candidates.sort((a,b)=>b.score-a.score).slice(0,5) };
   return best;
 }
 
-function handleFaq(faqItem) {
-  return {
-    type: 'answer',
-    text: faqItem.a,
-    meta: {
-      id: faqItem.id,
-      tags: faqItem.tags || [],
-      src: faqItem._src || faqItem.source || faqItem.src || null
-    }
-  };
+function handleFaq(item) {
+  if (!item) return null;
+  const meta = { source: item._src || item.source || item.src, id: item.id };
+  // Behold debug-kandidater dersom de finnes (API fjerner dem hvis trace ikke er på)
+  if (item._debug) meta.candidates = item._debug.candidates;
+  return { type: 'answer', text: item.a, meta };
 }
 
 module.exports = { detectFaq, handleFaq };
