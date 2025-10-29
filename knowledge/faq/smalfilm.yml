@@ -91,6 +91,7 @@ faq:
       Vi gir rabatt ut fra omfang. Kontakt oss på telefon eller e-post, så kan vi gi et prisestimat/tilbud basert på anslått mengde.
       Usikker på mengden? Oppgi gjerne **diameter på rullene** (på selve filmrullen, ikke spolen/huben).
     tags: ["smalfilm", "pris"]
+    boost: 2.0   # ✅ NYTT
 
   - id: smalfilm-wetgate
     q: "Renser dere filmene (WetGate)?"
