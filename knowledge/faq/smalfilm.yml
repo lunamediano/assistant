@@ -35,6 +35,29 @@ faq:
       Inkludert i prisen er WetGate-rens for best mulig resultat.
     tags: ["smalfilm", "super8", "8mm", "16mm", "tjenester"]
 
+      - id: smalfilm-formater
+    q: "Hvilke smalfilmformater tar dere?"
+    alt:
+      - "hvilke formater tar dere"
+      - "hvilke filmformater tar dere"
+      - "tar dere super 8"
+      - "tar dere 8mm"
+      - "tar dere 16mm"
+      - "tar dere 8 mm film"
+      - "hvilke smalfilmformater støtter dere"
+      - "filmformat oversikt"
+      - "hvilke filmtyper tar dere"
+      - "kan dere ta alle filmformater"
+      - "super8 16mm 8mm formater"
+      - "støttede smalfilmformater"
+      - "formatliste smalfilm"
+      - "digitaliserer dere super 8 og 16 mm"
+    a: >
+      Vi digitaliserer 8 mm, Super 8 og 16 mm smalfilm – med eller uten lyd.
+      Filmene skannes i høy oppløsning (opptil 4K) med WetGate-rens for best resultat.
+      Ta gjerne kontakt på telefon eller e-post for en vurdering av omfang og tilbud.
+    tags: ["smalfilm", "super8", "8mm", "16mm", "formater"]
+
   - id: smalfilm-pris
     q: "Hva koster det å digitalisere smalfilm?"
     alt:
