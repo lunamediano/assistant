@@ -1,5 +1,5 @@
 // api/assist.js
-// build-bump: 2025-10-30T12:40Z
+// build-bump: 2025-10-30T12:55Z
 
 const { createAssistant } = require('../core');
 const { loadKnowledge }   = require('../data/loadData');
@@ -13,7 +13,8 @@ function getAssistant() {
 function setCors(req, res) {
   const defaults = [
     'https://h05693dfe8-staging.onrocket.site',
-    'https://lunamedia.no'
+    'https://lunamedia.no',
+    'https://assistant-sigma-lovat.vercel.app'
   ];
   const extra = (process.env.LUNA_ALLOWED_ORIGINS || '')
     .split(',')
@@ -27,6 +28,7 @@ function setCors(req, res) {
   }
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Credentials', 'true'); // ✅ viktig for cross-site cookies
 }
 
 const dbg = {
@@ -47,7 +49,7 @@ const dbg = {
   },
   version: () => ({
     ok: true,
-    build: '2025-10-30T12:40Z',
+    build: '2025-10-30T12:55Z',
     commit: process.env.VERCEL_GIT_COMMIT_SHA || 'local',
     tag: process.env.VERCEL_GIT_COMMIT_REF || 'unknown'
   }),
@@ -143,9 +145,9 @@ function parseCookies(req) {
 
 function setTopicCookie(res, topic) {
   if (!topic) return;
-  // 15 minutter levetid
-  const maxAge = 15 * 60;
-  const cookie = `lm_topic=${encodeURIComponent(topic)}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
+  const maxAge = 15 * 60; // 15 min
+  // Cross-site cookie: må være SameSite=None + Secure
+  const cookie = `lm_topic=${encodeURIComponent(topic)}; Path=/; Max-Age=${maxAge}; SameSite=None; Secure`;
   res.setHeader('Set-Cookie', cookie);
 }
 
@@ -172,7 +174,6 @@ module.exports = async (req, res) => {
 
     const text  = (body?.message || body?.text || '').trim();
     const trace = (req.query && (req.query.trace === '1' || req.query.trace === 'true')) || !!body?.trace;
-
     if (!text) return res.status(400).json({ error: 'Missing message' });
 
     // History fra klient (om den finnes)
