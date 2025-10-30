@@ -6,23 +6,24 @@ const { fallbackHandler } = require('./handlers/fallbackHandler');
 const { loadKnowledge } = require('../data/loadData');
 
 function deriveTopicFromHistory(history = []) {
-  // Se på siste bruker- eller assistentmelding
   const last = [...history].reverse().find(m => typeof m?.text === 'string');
   if (!last) return null;
 
+  // 1) eksplisitt topic fra klient?
   const t = (last.topic || '').toLowerCase();
-  if (t) return t; // hvis klienten allerede satte topic
+  if (t) return t;
 
+  // 2) heuristikk på tekst
   const text = (last.text || '').toLowerCase();
   if (/vhs|videokassett|videobånd|video8|hi8|minidv|video/.test(text)) return 'video';
   if (/smalfilm|super ?8|8mm|16 ?mm/.test(text)) return 'smalfilm';
   if (/foto|bilde|bilder|dias|negativ/.test(text)) return 'foto';
 
-  // Prøv også meta fra forrige svar (dersom klienten sender den tilbake)
-  const metaSrc = (last.meta && last.meta.src) || '';
-  if (/\/video\.yml/i.test(metaSrc)) return 'video';
-  if (/\/smalfilm\.yml/i.test(metaSrc)) return 'smalfilm';
-  if (/\/foto\.yml/i.test(metaSrc)) return 'foto';
+  // 3) kilde-sti fra forrige meta (om klienten sender meta tilbake i history)
+  const src = (last.meta && (last.meta.src || last.meta.source)) || '';
+  if (/\/video\.yml/i.test(src)) return 'video';
+  if (/\/smalfilm\.yml/i.test(src)) return 'smalfilm';
+  if (/\/foto\.yml/i.test(src)) return 'foto';
 
   return null;
 }
@@ -35,7 +36,19 @@ function createAssistant() {
       const lower = (text || '').toLowerCase();
       const topicHint = deriveTopicFromHistory(history);
 
-      // 1) FAQ først (mest spesifikt), med topicHint-boost
+      // 0) Company først
+      const compIntent = detectCompanyIntent(lower);
+      if (compIntent) {
+        const r = handleCompanyIntent(compIntent, data.meta);
+        if (r) {
+          return {
+            ...r,
+            meta: { ...(r.meta || {}), route: 'company', intent: compIntent }
+          };
+        }
+      }
+
+      // 1) FAQ – med topicHint-boost
       const faqMatch = detectFaq(lower, data.faq, { topicHint });
       if (faqMatch) {
         const r = handleFaq(faqMatch);
@@ -44,17 +57,15 @@ function createAssistant() {
           meta: {
             ...(r.meta || {}),
             route: 'faq',
-            id: faqMatch.id,
-            src: faqMatch._src || faqMatch.source || null,
             topicHint: topicHint || null
           }
         };
       }
 
-      // 2) Pris (kan også bruke topicHint inni handleren om ønskelig)
+      // 2) Pris – nå med topicHint + history slik at "hva koster det?" arver kontekst
       const priceIntent = detectPriceIntent(lower);
       if (priceIntent) {
-        const r = handlePriceIntent(priceIntent, data.meta);
+        const r = handlePriceIntent(priceIntent, data.meta, { topicHint, history, userText: lower });
         if (r) {
           return {
             ...r,
@@ -63,19 +74,7 @@ function createAssistant() {
         }
       }
 
-      // 3) Company etterpå (adresse/åpningstider/telefon/levering generelt)
-      const compIntent = detectCompanyIntent(lower);
-      if (compIntent) {
-        const r = handleCompanyIntent(compIntent, data.meta);
-        if (r) {
-          return {
-            ...r,
-            meta: { ...(r.meta || {}), route: 'company', intent: compIntent, topicHint: topicHint || null }
-          };
-        }
-      }
-
-      // 4) Fallback
+      // 3) Fallback
       const r = fallbackHandler(text);
       return { ...r, meta: { route: 'fallback', topicHint: topicHint || null } };
     }
