@@ -1,5 +1,5 @@
 // api/assist.js
-// build-bump: 2025-10-07T12:20Z
+// build-bump: 2025-10-30T12:00Z
 
 const { createAssistant } = require('../core');
 const { loadKnowledge }   = require('../data/loadData');
@@ -26,7 +26,8 @@ function setCors(req, res) {
     res.setHeader('Vary', 'Origin');
   }
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  // ✅ Tillat X-Luna-Topic-hint i CORS
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Luna-Topic');
 }
 
 // ---- debug helpers ----
@@ -48,7 +49,7 @@ const dbg = {
   },
   version: () => ({
     ok: true,
-    build: '2025-10-07T12:20Z',
+    build: '2025-10-30T12:00Z',
     commit: process.env.VERCEL_GIT_COMMIT_SHA || 'local',
     tag: process.env.VERCEL_GIT_COMMIT_REF || 'unknown'
   }),
@@ -77,7 +78,7 @@ const dbg = {
   company: () => {
     try {
       const data = loadKnowledge();
-    return {
+      return {
         ok: true,
         hasCompany: !!data?.meta?.company,
         company: data?.meta?.company || null,
@@ -114,14 +115,18 @@ module.exports = async (req, res) => {
       try { body = JSON.parse(body); } catch { body = {}; }
     }
 
-    const text    = (body?.message || body?.text || '').trim();
-    const history = Array.isArray(body?.history) ? body.history : []; // tar imot historikk
-    const trace   = (req.query && (req.query.trace === '1' || req.query.trace === 'true')) || !!body?.trace;
+    const text     = (body?.message || body?.text || '').trim();
+    const history  = Array.isArray(body?.history) ? body.history : []; // tar imot historikk fra klient
+    const trace    = (req.query && (req.query.trace === '1' || req.query.trace === 'true')) || !!body?.trace;
 
     if (!text) return res.status(400).json({ error: 'Missing message' });
 
-    // send videre historikk til kjernen
-    const result = await getAssistant().handle({ text, history });
+    // ✅ Enkel “hint”-løsning: topic fra header eller body
+    const topic = (req.headers['x-luna-topic'] || body?.topic || '').toLowerCase();
+    const syntheticHistory = topic ? [{ role: 'assistant', text: '', topic }] : [];
+
+    // send videre (syntetisk hint + faktisk history) til kjernen
+    const result = await getAssistant().handle({ text, history: [...syntheticHistory, ...history] });
 
     if (result && typeof result.text === 'string') {
       let meta = result.meta || null;
