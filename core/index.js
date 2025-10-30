@@ -6,29 +6,26 @@ const { fallbackHandler } = require('./handlers/fallbackHandler');
 const { loadKnowledge } = require('../data/loadData');
 
 function deriveTopicFromHistory(history = []) {
-  const last = [...history].reverse().find(m => typeof m?.text === 'string' || m?.meta);
+  // Finn siste melding som faktisk har tekst (user/assistant)
+  const last = [...history].reverse().find(m => typeof m?.text === 'string');
   if (!last) return null;
 
+  // 1) Hvis klienten har satt topic direkte
   const t = (last.topic || '').toLowerCase();
   if (t) return t;
 
+  // 2) Heuristikk på tekstinnhold
   const text = (last.text || '').toLowerCase();
   if (/vhs|videokassett|videobånd|video8|hi8|minidv|video/.test(text)) return 'video';
   if (/smalfilm|super ?8|8mm|16 ?mm/.test(text)) return 'smalfilm';
   if (/foto|bilde|bilder|dias|negativ/.test(text)) return 'foto';
 
-  const src = (last.meta && (last.meta.src || last.meta.source)) || '';
-  if (/\/video\.yml$/i.test(src)) return 'video';
-  if (/\/smalfilm\.yml$/i.test(src)) return 'smalfilm';
-  if (/\/foto\.yml$/i.test(src)) return 'foto';
+  // 3) Les forrige kilde (om meta sendes i history)
+  const metaSrc = (last.meta && last.meta.src) || '';
+  if (/\/video\.yml/i.test(metaSrc)) return 'video';
+  if (/\/smalfilm\.yml/i.test(metaSrc)) return 'smalfilm';
+  if (/\/foto\.yml/i.test(metaSrc)) return 'foto';
 
-  return null;
-}
-
-function topicFromFilepath(src = '') {
-  if (/\/video\.yml$/i.test(src)) return 'video';
-  if (/\/smalfilm\.yml$/i.test(src)) return 'smalfilm';
-  if (/\/foto\.yml$/i.test(src)) return 'foto';
   return null;
 }
 
@@ -38,9 +35,9 @@ function createAssistant() {
   return {
     async handle({ text, history = [] }) {
       const lower = (text || '').toLowerCase();
-      const topicHintFromHistory = deriveTopicFromHistory(history);
+      const topicHint = deriveTopicFromHistory(history);
 
-      // 0) Company
+      // 0) Company-intents først
       const compIntent = detectCompanyIntent(lower);
       if (compIntent) {
         const r = handleCompanyIntent(compIntent, data.meta);
@@ -52,41 +49,44 @@ function createAssistant() {
         }
       }
 
-      // 1) FAQ (topicHint brukes inni detectFaq hvis den støttes – ekstra args er trygge i JS)
-      const faqMatch = detectFaq(lower, data.faq, { topicHint: topicHintFromHistory });
+      // 1) FAQ – la detectFaq evt. bruke topicHint (OK om den ignorerer ekstra arg)
+      const faqMatch = detectFaq(lower, data.faq, { topicHint });
       if (faqMatch) {
         const r = handleFaq(faqMatch);
-
-        const src = faqMatch._src || faqMatch.source || faqMatch.src || null;
-        const topic = topicFromFilepath(src);
-
         return {
           ...r,
           meta: {
             ...(r.meta || {}),
             route: 'faq',
             id: faqMatch.id,
-            src,
-            topic: topic || null
+            src: faqMatch._src || faqMatch.source || null,
+            topic: faqMatch.topic || topicHint || null
           }
         };
       }
 
-      // 2) Pris – send med topicHint fra historikken
+      // 2) Pris – gi handleren kontekst fra history
       const priceIntent = detectPriceIntent(lower);
       if (priceIntent) {
-        const r = handlePriceIntent(priceIntent, data.meta, { topicHint: topicHintFromHistory });
+        const prev = [...history].reverse().find(m => m && m.meta && typeof m.meta === 'object');
+        const ctx = {
+          topicHint,
+          lastFaqId: prev?.meta?.id || null,
+          lastFaqSrc: prev?.meta?.src || null,
+          lastTopic: prev?.meta?.topic || null
+        };
+        const r = handlePriceIntent(priceIntent, data.meta, ctx);
         if (r) {
           return {
             ...r,
-            meta: { ...(r.meta || {}), route: 'price', intent: priceIntent, topicHint: topicHintFromHistory || null }
+            meta: { ...(r.meta || {}), route: 'price', intent: priceIntent, topicHint, ctx }
           };
         }
       }
 
       // 3) Fallback
       const r = fallbackHandler(text);
-      return { ...r, meta: { route: 'fallback', topicHint: topicHintFromHistory || null } };
+      return { ...r, meta: { route: 'fallback', topicHint: topicHint || null } };
     }
   };
 }
