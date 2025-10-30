@@ -1,55 +1,99 @@
 // core/handlers/priceHandler.js
 
-function detectPriceIntent(lower, history = []) {
-  const hasPriceWord = /(pris|koster|kostnad|betaling|rabatt|tilbud)/.test(lower);
-  if (!hasPriceWord) return null;
-
-  // Finn siste tema i historikken (video, smalfilm, foto, retusjering, spesial)
-  let lastTopic = null;
-  const reversed = [...(history || [])].reverse();
-  for (const h of reversed) {
-    const content = (h.content || h.text || '').toLowerCase();
-    if (/vhs|video|videokassett/.test(content)) { lastTopic = 'video'; break; }
-    if (/smalfilm|super\s*8|8mm|16mm/.test(content)) { lastTopic = 'smalfilm'; break; }
-    if (/foto|bilde|dias|negativ/.test(content)) { lastTopic = 'foto'; break; }
-    if (/retusj|restaurer|reparer/.test(content)) { lastTopic = 'retusjering'; break; }
-  }
-
-  return { type: 'price', topic: lastTopic };
+function norm(s) {
+  return (s || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^\p{Letter}\p{Number}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
-function handlePriceIntent(intent, data) {
-  const topic = intent.topic;
-  const faqs = data.faq || [];
+function detectPriceIntent(text) {
+  const t = norm(text);
+  // enkle prisord
+  if (/(hva koster|pris|kostnad|hvor mye|hvor mye koster)/.test(t)) return 'price_general';
+  return null;
+}
 
-  if (!topic) {
-    // Ingen tidligere tema → gi nøytralt svar
+// Velg kategori basert på (1) topicHint, (2) brukerens tekst, (3) siste history-tekst/meta
+function chooseCategory({ topicHint, userText = '', history = [] } = {}) {
+  const t = norm(userText);
+
+  // 1) TopicHint fra kjernen
+  if (topicHint === 'video' || /video/.test(t)) return 'video';
+  if (topicHint === 'smalfilm' || /(smalfilm|super 8|8mm|16mm|16 mm)/.test(t)) return 'smalfilm';
+  if (topicHint === 'foto' || /(foto|bilde|bilder|dias|negativ)/.test(t)) return 'foto';
+
+  // 2) Sjekk history (siste relevante melding)
+  const last = [...(history || [])].reverse().find(m => typeof m?.text === 'string');
+  if (last) {
+    const lt = norm(last.text);
+    if (/video|vhs|videokassett|videobånd|video8|hi8|minidv/.test(lt)) return 'video';
+    if (/smalfilm|super 8|8mm|16mm|16 mm/.test(lt)) return 'smalfilm';
+    if (/foto|bilde|bilder|dias|negativ/.test(lt)) return 'foto';
+
+    const src = (last.meta && (last.meta.src || last.meta.source)) || '';
+    if (/\/video\.yml/i.test(src)) return 'video';
+    if (/\/smalfilm\.yml/i.test(src)) return 'smalfilm';
+    if (/\/foto\.yml/i.test(src)) return 'foto';
+  }
+
+  return null; // ukjent – be om presisering
+}
+
+function priceTextFor(category) {
+  switch (category) {
+    case 'video':
+      return {
+        text:
+          'Video (VHS/VHS-C/Video8/Hi8/MiniDV): **kr 315,- per digitalisert time**. Mengderabatt: –10 % fra 10 timer, –20 % fra 20 timer.',
+        meta: { src: '/knowledge/faq/video.yml', id: 'vhs-pris', category: 'video' }
+      };
+    case 'smalfilm':
+      return {
+        text:
+          'Smalfilm: **fra ca. kr 75/min (8 mm/Super 8)** og **fra ca. kr 90/min (16 mm)** + **kr 95 per rull** (start). Tillegg for lyd. Mengderabatt etter omfang.',
+        meta: { src: '/knowledge/faq/smalfilm.yml', id: 'smalfilm-pris', category: 'smalfilm' }
+      };
+    case 'foto':
+      return {
+        text:
+          'Fotoskanning: **fra ca. kr 10,- per bilde/dias** (inkl. mva). Oppløsning etter behov (skjerm/utskrift).',
+        meta: { src: '/knowledge/faq/foto.yml', id: 'foto-pris-opplosning', category: 'foto' }
+      };
+    default:
+      return null;
+  }
+}
+
+function handlePriceIntent(_intent, _meta, ctx = {}) {
+  const category = chooseCategory(ctx);
+
+  if (!category) {
+    // kunne ikke avgjøre – be brukeren spesifisere, men hold det kort
     return {
-      text: 'Prisene varierer litt mellom video, smalfilm og foto. Hva gjelder det?'
+      type: 'answer',
+      text: 'Gjelder det video, smalfilm eller fotoskanning?',
+      suggestion: 'Skriv f.eks. «video», «smalfilm» eller «foto».',
+      meta: { need: 'category' }
     };
   }
 
-  // Finn riktig prisoppføring fra FAQ basert på tema
-  const match = faqs.find(f => {
-    if (!f.id) return false;
-    if (topic === 'video') return /vhs|video/.test(f.id);
-    if (topic === 'smalfilm') return /smalfilm/.test(f.id);
-    if (topic === 'foto') return /foto-pris|foto-.*pris/.test(f.id);
-    if (topic === 'retusjering') return /foto-pris-retusjering/.test(f.id);
-    return false;
-  });
-
-  if (match) {
+  const p = priceTextFor(category);
+  if (p) {
     return {
-      text: match.a,
-      meta: { topic, id: match.id, _src: match._src }
+      type: 'answer',
+      text: p.text,
+      meta: { ...(p.meta || {}) }
     };
   }
 
-  // Fallback – hvis ingen spesifikk pris ble funnet
+  // fallback (burde ikke skje)
   return {
-    text: `Jeg finner ingen konkret pris for ${topic}-tjenesten akkurat nå, men vi kan gi et estimat om du beskriver omfanget.`,
-    meta: { topic, route: 'price' }
+    type: 'answer',
+    text: 'Prisene varierer mellom video, smalfilm og foto. Si gjerne hva det gjelder, så får du riktig pris.',
+    meta: { need: 'category' }
   };
 }
 
