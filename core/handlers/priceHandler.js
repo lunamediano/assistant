@@ -1,99 +1,102 @@
 // core/handlers/priceHandler.js
+// Enkel pris-intent + svar som bruker topicHint for å velge riktig prisområde.
 
-function norm(s) {
-  return (s || '')
-    .toLowerCase()
-    .normalize('NFKD')
-    .replace(/[^\p{Letter}\p{Number}\s]/gu, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+const path = require('path');
+// Les priser fra JSON én gang:
+let PRICES = null;
+try {
+  PRICES = require('../../data/priser.json');
+} catch (e) {
+  // fail soft – lar handleren fortsatt svare noe generelt
+  PRICES = null;
 }
 
-function detectPriceIntent(text) {
-  const t = norm(text);
-  // enkle prisord
-  if (/(hva koster|pris|kostnad|hvor mye|hvor mye koster)/.test(t)) return 'price_general';
+// veldig enkel detektor: leter etter “pris”, “koster”, “kostnad”, “rabatt”
+function detectPriceIntent(text = '') {
+  const t = (text || '').toLowerCase();
+  if (/(pris|koster|kostnad|rabatt)/.test(t)) return 'generic_price';
   return null;
 }
 
-// Velg kategori basert på (1) topicHint, (2) brukerens tekst, (3) siste history-tekst/meta
-function chooseCategory({ topicHint, userText = '', history = [] } = {}) {
-  const t = norm(userText);
-
-  // 1) TopicHint fra kjernen
-  if (topicHint === 'video' || /video/.test(t)) return 'video';
-  if (topicHint === 'smalfilm' || /(smalfilm|super 8|8mm|16mm|16 mm)/.test(t)) return 'smalfilm';
-  if (topicHint === 'foto' || /(foto|bilde|bilder|dias|negativ)/.test(t)) return 'foto';
-
-  // 2) Sjekk history (siste relevante melding)
-  const last = [...(history || [])].reverse().find(m => typeof m?.text === 'string');
-  if (last) {
-    const lt = norm(last.text);
-    if (/video|vhs|videokassett|videobånd|video8|hi8|minidv/.test(lt)) return 'video';
-    if (/smalfilm|super 8|8mm|16mm|16 mm/.test(lt)) return 'smalfilm';
-    if (/foto|bilde|bilder|dias|negativ/.test(lt)) return 'foto';
-
-    const src = (last.meta && (last.meta.src || last.meta.source)) || '';
-    if (/\/video\.yml/i.test(src)) return 'video';
-    if (/\/smalfilm\.yml/i.test(src)) return 'smalfilm';
-    if (/\/foto\.yml/i.test(src)) return 'foto';
-  }
-
-  return null; // ukjent – be om presisering
-}
-
-function priceTextFor(category) {
-  switch (category) {
-    case 'video':
-      return {
-        text:
-          'Video (VHS/VHS-C/Video8/Hi8/MiniDV): **kr 315,- per digitalisert time**. Mengderabatt: –10 % fra 10 timer, –20 % fra 20 timer.',
-        meta: { src: '/knowledge/faq/video.yml', id: 'vhs-pris', category: 'video' }
-      };
-    case 'smalfilm':
-      return {
-        text:
-          'Smalfilm: **fra ca. kr 75/min (8 mm/Super 8)** og **fra ca. kr 90/min (16 mm)** + **kr 95 per rull** (start). Tillegg for lyd. Mengderabatt etter omfang.',
-        meta: { src: '/knowledge/faq/smalfilm.yml', id: 'smalfilm-pris', category: 'smalfilm' }
-      };
-    case 'foto':
-      return {
-        text:
-          'Fotoskanning: **fra ca. kr 10,- per bilde/dias** (inkl. mva). Oppløsning etter behov (skjerm/utskrift).',
-        meta: { src: '/knowledge/faq/foto.yml', id: 'foto-pris-opplosning', category: 'foto' }
-      };
-    default:
-      return null;
+function formatCurrency(n) {
+  try {
+    return new Intl.NumberFormat('no-NO').format(n);
+  } catch {
+    return String(n);
   }
 }
 
-function handlePriceIntent(_intent, _meta, ctx = {}) {
-  const category = chooseCategory(ctx);
+function answerForVideo() {
+  // Bruker både gammel flate nøkler og ev. services.video
+  const rate = (PRICES?.vhs_time_rate) ?? (PRICES?.services?.video?.rate) ?? 315;
+  const d10  = (PRICES?.vhs_bulk_discount_10h) ?? 0.10;
+  const d20  = (PRICES?.vhs_bulk_discount_20h) ?? 0.20;
 
-  if (!category) {
-    // kunne ikke avgjøre – be brukeren spesifisere, men hold det kort
+  let s = `Video (VHS/Video8/Hi8/MiniDV): **kr ${formatCurrency(rate)} per time digitalisert video**.\n`;
+  s += `Mengderabatt: **–${Math.round(d10*100)} %** fra **10 timer**, **–${Math.round(d20*100)} %** fra **20 timer**.\n`;
+  if (PRICES?.usb_min_price) {
+    s += `USB/minnepenn fra **kr ${formatCurrency(PRICES.usb_min_price)}** (størrelse etter behov).`;
+  }
+  return s.trim();
+}
+
+function answerForSmalfilm() {
+  const r8  = (PRICES?.smalfilm_min_rate) ?? (PRICES?.services?.smalfilm?.units?.['8mm_super8']?.rate) ?? 75;
+  const r16 = (PRICES?.smalfilm_16mm_min_rate) ?? (PRICES?.services?.smalfilm?.units?.['16mm']?.rate) ?? 90;
+  const start = (PRICES?.smalfilm_start_per_rull) ?? 95;
+
+  let s = `Smalfilm:\n• **8 mm/Super 8:** fra **kr ${formatCurrency(r8)} per minutt**\n`;
+  s += `• **16 mm:** fra **kr ${formatCurrency(r16)} per minutt**\n`;
+  s += `• Startgebyr: **kr ${formatCurrency(start)} per rull**\n`;
+  s += `Rabatt vurderes ut fra mengde. Filmer med lyd kan gi tillegg.`;
+  return s.trim();
+}
+
+function answerForFoto() {
+  const scanFrom = (PRICES?.services?.foto?.scan_from_price_per_item) ?? 10;
+  const retFrom  = (PRICES?.retusjering_from) ?? (PRICES?.services?.foto?.retouch_from_price) ?? 700;
+
+  let s = `Foto/dias/negativer:\n• Skanning fra **kr ${formatCurrency(scanFrom)} per bilde/dias**\n`;
+  s += `• Retusjering fra **kr ${formatCurrency(retFrom)} per fotografi** (avhenger av omfang)\n`;
+  s += `USB/nedlasting etter ønske.`;
+  return s.trim();
+}
+
+function answerGenericAskWhich() {
+  return `Gjelder det **video**, **smalfilm** eller **foto**? Så gir jeg riktig pris med en gang.`;
+}
+
+function handlePriceIntent(intent, meta, opts = {}) {
+  // velg tema ut fra hint (fra historikk) eller meta.company/services hvis du ønsker
+  const hint = (opts.topicHint || '').toLowerCase();
+
+  if (hint === 'video') {
     return {
       type: 'answer',
-      text: 'Gjelder det video, smalfilm eller fotoskanning?',
-      suggestion: 'Skriv f.eks. «video», «smalfilm» eller «foto».',
-      meta: { need: 'category' }
+      text: answerForVideo(),
+      meta: { source: 'priser.json', topic: 'video' }
+    };
+  }
+  if (hint === 'smalfilm') {
+    return {
+      type: 'answer',
+      text: answerForSmalfilm(),
+      meta: { source: 'priser.json', topic: 'smalfilm' }
+    };
+  }
+  if (hint === 'foto') {
+    return {
+      type: 'answer',
+      text: answerForFoto(),
+      meta: { source: 'priser.json', topic: 'foto' }
     };
   }
 
-  const p = priceTextFor(category);
-  if (p) {
-    return {
-      type: 'answer',
-      text: p.text,
-      meta: { ...(p.meta || {}) }
-    };
-  }
-
-  // fallback (burde ikke skje)
+  // ingen hint → spør hva det gjelder (kort og tydelig)
   return {
     type: 'answer',
-    text: 'Prisene varierer mellom video, smalfilm og foto. Si gjerne hva det gjelder, så får du riktig pris.',
-    meta: { need: 'category' }
+    text: answerGenericAskWhich(),
+    meta: { source: 'priser.json', need: 'topic' }
   };
 }
 
