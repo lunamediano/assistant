@@ -1,11 +1,4 @@
 // core/handlers/priceHandler.js
-const path = require('path');
-let PRISER = null;
-try {
-  PRISER = require('../../data/priser.json');
-} catch {
-  PRISER = null; // fallback hvis fil mangler – vi håndterer det nedenfor
-}
 
 function norm(s) {
   return (s || '')
@@ -16,112 +9,136 @@ function norm(s) {
     .trim();
 }
 
-// ---- intent detection ----
-function detectPriceIntent(text) {
+// Små hjelpelister for enkel emnedeteksjon
+const TOKENS = {
+  video: [
+    'vhs','videokassett','videobånd','videoband','video8','hi8','minidv','mini dv',
+    'digital8','digital 8','video','svhs','s vhs'
+  ],
+  smalfilm: [
+    'smalfilm','super 8','super8','8mm','8 mm','16mm','16 mm','filmrull','film rull',
+    'smalfilmpris','smalfilm pris'
+  ],
+  foto: [
+    'foto','bilde','bilder','dias','lysbild','slide','negativ','negativer','skanning','skanne'
+  ]
+};
+
+function containsAny(text, arr) {
   const t = norm(text);
-
-  // generisk pris-forespørsel
-  const priceWords = /(pris|priser|kostnad|hva koster|hva koster det|prisoverslag|estimat|tilbud)\b/;
-  if (!priceWords.test(t)) return null;
-
-  // prøv å lese tema fra teksten
-  if (/\b(vhs|videokassett|videobånd|video8|hi8|minidv|video)\b/.test(t)) return 'price_video';
-  if (/\b(smalfilm|super ?8|8mm|16 ?mm)\b/.test(t)) return 'price_smalfilm';
-  if (/\b(foto|bilde|bilder|dias|negativ)\b/.test(t)) return 'price_foto';
-
-  return 'price_generic';
+  return arr.some(tok => t.includes(norm(tok)));
 }
 
-function formatCurrency(nok) {
-  try {
-    return new Intl.NumberFormat('no-NO', { style: 'currency', currency: 'NOK', maximumFractionDigits: 0 }).format(nok);
-  } catch {
-    return `kr ${Number(nok).toLocaleString('no-NO', { maximumFractionDigits: 0 })},-`;
-  }
-}
-
-function priceTextVideo(p) {
-  const h = p?.vhs_time_rate ?? 315;
-  const d10 = p?.vhs_bulk_discount_10h ?? 0.10;
-  const d20 = p?.vhs_bulk_discount_20h ?? 0.20;
-  const usb = p?.usb_min_price ?? 295;
-
-  return {
-    type: 'answer',
-    text:
-      `Video (VHS/Hi8/MiniDV m.fl.): ${formatCurrency(h)} per digitalisert time.\n` +
-      `Mengderabatt: −${Math.round(d10 * 100)} % fra 10 timer, −${Math.round(d20 * 100)} % fra 20 timer.\n` +
-      `USB/minnepenn fra ${formatCurrency(usb)} (eller egen USB/nedlasting).`,
-    meta: { source: 'priser.json', topic: 'video' }
-  };
-}
-
-function priceTextSmalfilm(p) {
-  const minRate = p?.smalfilm_min_rate ?? 75;
-  const start = p?.smalfilm_start_per_rull ?? 95;
-  const usb = p?.usb_min_price ?? 295;
-
-  return {
-    type: 'answer',
-    text:
-      `Smalfilm (8 mm / Super 8 / 16 mm): fra ${formatCurrency(minRate)} per minutt.\n` +
-      `Startgebyr: ${formatCurrency(start)} per rull. Lyd på film gir et tillegg.\n` +
-      `USB/minnepenn fra ${formatCurrency(usb)} (eller nedlasting / egen USB).`,
-    meta: { source: 'priser.json', topic: 'smalfilm' }
-  };
-}
-
-function priceTextFoto(p) {
-  const fotoFrom = 10; // fra kunnskapsfilene – sett gjerne i priser.json hvis ønskelig
-  const usb = p?.usb_min_price ?? 295;
-
-  return {
-    type: 'answer',
-    text:
-      `Fotoskanning: fra ${formatCurrency(fotoFrom)} per bilde/dias (inkl. mva), etter ønsket oppløsning.\n` +
-      `Levering via nedlasting eller på USB/minnepenn fra ${formatCurrency(usb)}.`,
-    meta: { source: 'faq/foto.yml', topic: 'foto' }
-  };
-}
-
-/**
- * Velg topic basert på intent + topicHint.
- * priority: explicit intent > topicHint > null
- */
-function resolveTopic(intent, topicHint) {
-  if (intent === 'price_video') return 'video';
-  if (intent === 'price_smalfilm') return 'smalfilm';
-  if (intent === 'price_foto') return 'foto';
-  if (intent === 'price_generic') {
-    if (topicHint === 'video' || topicHint === 'smalfilm' || topicHint === 'foto') return topicHint;
-    return null;
-  }
+// Prøv å hente emne (subject) direkte fra teksten
+function inferSubjectFromText(text) {
+  if (!text) return null;
+  if (containsAny(text, TOKENS.smalfilm)) return 'smalfilm';
+  if (containsAny(text, TOKENS.video))    return 'video';
+  if (containsAny(text, TOKENS.foto))     return 'foto';
   return null;
 }
 
-function handlePriceIntent(intent, _meta, opts = {}) {
-  const topic = resolveTopic(intent, opts.topicHint || null);
+// «Mild fallback»: noen svært vanlige oppfølginger
+function gentleFollowupSubject(text) {
+  const t = norm(text);
+  if (/^og smalfilm\??$/.test(t) || /smalfilm\??$/.test(t)) return 'smalfilm';
+  if (/^og video\??$/.test(t)    || /video\??$/.test(t))    return 'video';
+  if (/^og foto\??$/.test(t)     || /foto\??$/.test(t))     return 'foto';
+  return null;
+}
 
-  // Hvis vi ikke klarer å avgjøre tema, be høflig om presisering (men nå vil dette
-  // kun skje når hverken tekst eller historikk sier noe om video/smalfilm/foto).
-  if (!topic) {
+/**
+ * detectPriceIntent(text: string) -> { intent: 'price', subject?: 'video'|'smalfilm'|'foto', raw: string } | null
+ */
+function detectPriceIntent(text) {
+  const t = norm(text);
+
+  // nøkkelord for «pris-intensjon»
+  const looksLikePrice =
+    t.includes('pris') ||
+    t.includes('hva koster') ||
+    t.includes('kostnad') ||
+    t.includes('hvor mye koster') ||
+    t.includes('prisene') ||
+    t.includes('prislista') ||
+    t.includes('prisliste');
+
+  if (!looksLikePrice) return null;
+
+  // Prøv først å se om emnet står i selve spørsmålet
+  const subject =
+    inferSubjectFromText(t) ||
+    gentleFollowupSubject(t) ||
+    null;
+
+  return { intent: 'price', subject, raw: text };
+}
+
+/**
+ * handlePriceIntent(priceIntent, meta, { topicHint } = {})
+ *  - priceIntent.subject kan være 'video' | 'smalfilm' | 'foto' | null
+ *  - topicHint kan være 'video' | 'smalfilm' | 'foto' | null (fra historikken)
+ */
+function handlePriceIntent(priceIntent, meta, { topicHint } = {}) {
+  // Velg emne i prioritert rekkefølge:
+  //  1) eksplisitt i spørsmålet (subject)
+  //  2) topicHint (fra historikk)
+  //  3) prøv «mild fallback» på nytt (i tilfelle subject ikke ble satt, men teksten likevel er avslørende)
+  //  4) siste utvei: spør hvilket format
+  let subject =
+    priceIntent?.subject ||
+    topicHint ||
+    gentleFollowupSubject(priceIntent?.raw || '') ||
+    null;
+
+  // Hvis vi fortsatt ikke har subject: spør brukeren presist
+  if (!subject) {
     return {
       type: 'answer',
-      text: 'Gjelder det **video**, **smalfilm** eller **foto**?',
-      meta: { source: 'priceHandler', need: 'topic' }
+      text:
+        'Prisene varierer mellom video, smalfilm og fotoskanning. Gjelder det **video**, **smalfilm** eller **foto**?',
+      meta: { source: 'priceHandler', subject: null }
     };
   }
 
-  // Returnér riktig pris-tekst basert på tema
-  if (topic === 'video') return priceTextVideo(PRISER || {});
-  if (topic === 'smalfilm') return priceTextSmalfilm(PRISER || {});
-  if (topic === 'foto') return priceTextFoto(PRISER || {});
+  // Canned priser – hold konsistent med dagens kunnskapsfiler
+  if (subject === 'video') {
+    return {
+      type: 'answer',
+      text:
+        'Video (VHS, Video8/Hi8, MiniDV m.fl.): **kr 315,- per digitalisert time**. ' +
+        'Mengderabatt: **–10 %** fra **10 timer**, **–20 %** fra **20 timer**.',
+      meta: { source: 'priceHandler', subject: 'video' }
+    };
+  }
 
-  // Fallback (bør i praksis ikke skje)
+  if (subject === 'smalfilm') {
+    return {
+      type: 'answer',
+      text:
+        'Smalfilm: **8 mm/Super 8 fra ca. kr 75 per minutt**, **16 mm fra ca. kr 90 per minutt**. ' +
+        'Startgebyr **kr 95 per rull**. Film **med lyd** gir et lite tillegg. ' +
+        'Vi gir rabatt ut fra omfang – gi oss gjerne ca. mengde så får du et estimat.',
+      meta: { source: 'priceHandler', subject: 'smalfilm' }
+    };
+  }
+
+  if (subject === 'foto') {
+    return {
+      type: 'answer',
+      text:
+        'Fotoskanning: fra **kr 10,- per bilde/dias** (inkl. mva). ' +
+        'Oppløsning velges etter behov (skjerm/utskrift). ' +
+        'Retusjering tilbys også (fra-nivå, avhenger av omfang).',
+      meta: { source: 'priceHandler', subject: 'foto' }
+    };
+  }
+
+  // Hvis subject har en uventet verdi – spør presist
   return {
     type: 'answer',
-    text: 'Jeg fant ikke prisinformasjon for dette temaet akkurat nå.',
-    meta: { source: 'priceHandler', topic }
+    text: 'Gjelder pris for **video**, **smalfilm** eller **foto**?',
+    meta: { source: 'priceHandler', subject: null }
   };
 }
 
