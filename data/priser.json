@@ -1,25 +1,92 @@
 {
+  "version": "1.2",
+  "updated_at": "2025-10-30",
   "valuta": "NOK",
 
+  // --- Video (VHS/Video8/Hi8/MiniDV) ---
   "vhs_time_rate": 315,
   "vhs_bulk_discount_10h": 0.10,
   "vhs_bulk_discount_20h": 0.20,
 
+  // --- Smalfilm (8 mm / Super 8 / 16 mm) ---
   "smalfilm_min_rate": 75,
+  "smalfilm_16mm_min_rate": 90,
   "smalfilm_start_per_rull": 95,
   "smalfilm_default_ruller": 1,
 
+  // --- USB / Minnepenn ---
   "usb_min_price": 295,
+  "usb_price_tiers": [
+    { "size": "64GB",  "price": 295 },
+    { "size": "128GB", "price": 395 },
+    { "size": "256GB", "price": 495 },
+    { "size": "512GB", "price": 695 },
+    { "size": "1TB",   "price": 995 },
+    { "size": "2TB",   "price": 1495 }
+  ],
+
+  // --- Foto / Retusjering (nye) ---
+  "retusjering_from": 700,
+
+  // --- Reparasjon (videokassetter) (ny) ---
+  "repair": {
+    "hourly_rate": 990,
+    "min_quarter_hour": 0.25,
+    "notes": [
+      "Enkle reparasjoner (f.eks. skjøt/bytte hus) kan inngå hvis svært små.",
+      "Ved større omfang gis pris på forhånd."
+    ]
+  },
 
   "policy": {
     "no_flat_per_tape_price": true,
     "vhs_pricing_unit": "per_time_hours",
     "ask_duration_if_unknown": true,
+    "rush_available": true,
+    "pickup_delivery_vestfold": true,
     "notes": [
       "VHS prises pr time digitalisert video.",
       "Be om estimert varighet hvis kunde ikke oppgir timer/minutter.",
-      "USB/minnepenn kommer i tillegg."
+      "USB/minnepenn kommer i tillegg.",
+      "Ekspress kan være mulig etter avtale (rush-tillegg).",
+      "Vi henter/leverer i Vestfold etter avtale."
     ]
+  },
+
+  "services": {
+    "video": {
+      "aliases": ["vhs", "video8", "hi8", "minidv", "videokassett", "videobånd"],
+      "unit": "per_time_hours",
+      "rate": 315,
+      "discounts": [
+        { "threshold_hours": 10, "percent": 10 },
+        { "threshold_hours": 20, "percent": 20 }
+      ]
+    },
+    "smalfilm": {
+      "aliases": ["smalfilm", "super8", "8mm", "16mm", "16 mm"],
+      "units": {
+        "8mm_super8": { "unit": "per_minute", "rate": 75 },
+        "16mm":       { "unit": "per_minute", "rate": 90 }
+      },
+      "per_roll_start_fee": 95,
+      "audio_surcharge_possible": true
+    },
+    "foto": {
+      "aliases": ["foto", "bilder", "dias", "negativer"],
+      "scan_from_price_per_item": 10,
+      "retouch_from_price": 700
+    },
+    "media": {
+      "usb_tiers": [
+        { "size": "64GB",  "price": 295 },
+        { "size": "128GB", "price": 395 },
+        { "size": "256GB", "price": 495 },
+        { "size": "512GB", "price": 695 },
+        { "size": "1TB",   "price": 995 },
+        { "size": "2TB",   "price": 1495 }
+      ]
+    }
   },
 
   "eksempler": {
@@ -37,14 +104,26 @@
     ],
     "smalfilm": [
       {
-        "beskrivelse": "10 minutter + 1 rull startgebyr",
+        "beskrivelse": "10 minutter 8mm/Super 8 + 1 rull startgebyr",
         "utregning": "10 × 75 + 95",
         "sum": 845
       },
       {
-        "beskrivelse": "30 minutter + 2 ruller startgebyr",
+        "beskrivelse": "30 minutter 8mm/Super 8 + 2 ruller startgebyr",
         "utregning": "30 × 75 + 2 × 95",
         "sum": 2590
+      },
+      {
+        "beskrivelse": "12 minutter 16 mm + 1 rull startgebyr",
+        "utregning": "12 × 90 + 95",
+        "sum": 1175
+      }
+    ],
+    "foto": [
+      {
+        "beskrivelse": "Retusjering av ett fotografi (moderate skader)",
+        "utregning": "fra 700",
+        "sum": 700
       }
     ],
     "tillegg": [
@@ -55,5 +134,5 @@
     ]
   },
 
-  "forbehold": "Endelig pris avhenger av faktisk spilletid, antall ruller og eventuelle tillegg. Be om tilbud for nøyaktig pris."
+  "forbehold": "Endelig pris avhenger av faktisk spilletid/antall ruller/omfang og eventuelle tillegg. Be om tilbud for nøyaktig pris."
 }
