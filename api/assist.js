@@ -1,23 +1,12 @@
 // api/assist.js
-// build-bump: 2025-10-30T15:20Z
+// build-bump: 2025-10-30T12:40Z
 
-const { loadKnowledge } = require('../data/loadData');
+const { createAssistant } = require('../core');
+const { loadKnowledge }   = require('../data/loadData');
 
-let assistant = null;
-let coreLoadError = null;
-
-// Lazy loader for core to prevent 500s on debug routes if a handler has syntax errors
+let assistant;
 function getAssistant() {
-  if (assistant) return assistant;
-  try {
-    // IMPORTANT: require here (lazy), not at top
-    const { createAssistant } = require('../core');
-    assistant = createAssistant();
-    coreLoadError = null;
-  } catch (e) {
-    coreLoadError = String(e && e.stack ? e.stack : e);
-    assistant = null;
-  }
+  if (!assistant) assistant = createAssistant();
   return assistant;
 }
 
@@ -40,7 +29,6 @@ function setCors(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
-// ---- debug helpers ----
 const dbg = {
   env: () => ({
     ASSISTANT_MODE: process.env.ASSISTANT_MODE || 'unset',
@@ -48,22 +36,29 @@ const dbg = {
     DEBUG_ASSISTANT: process.env.DEBUG_ASSISTANT || 'unset',
     node: process.version
   }),
+  mode: () => {
+    const flag = (process.env.USE_MODULAR_ASSISTANT || '').toLowerCase();
+    const mode = (process.env.ASSISTANT_MODE || '').toLowerCase();
+    const computed = mode === 'modular' || flag === '1' || flag === 'true';
+    return {
+      computed: { useModular: computed },
+      env: { ASSISTANT_MODE: mode || 'unset', USE_MODULAR_ASSISTANT: flag || 'unset' }
+    };
+  },
   version: () => ({
     ok: true,
-    build: '2025-10-30T15:20Z',
+    build: '2025-10-30T12:40Z',
     commit: process.env.VERCEL_GIT_COMMIT_SHA || 'local',
     tag: process.env.VERCEL_GIT_COMMIT_REF || 'unknown'
   }),
   which: () => {
-    try {
-      const core = require('../core'); // may throw if handlers broken
-      return {
-        ok: true,
-        hasCreate: typeof core.createAssistant === 'function'
-      };
-    } catch (e) {
-      return { ok: false, error: String(e && e.message ? e.message : e) };
-    }
+    const hasCreate = typeof require('../core').createAssistant === 'function';
+    return {
+      ok: true,
+      hasCreate,
+      required: hasCreate ? ['createAssistant'] : [],
+      error: hasCreate ? null : 'Fant ikke core eller createAssistant'
+    };
   },
   knowledge: () => {
     try {
@@ -94,70 +89,71 @@ const dbg = {
       return { ok: false, error: String(e?.message || e) };
     }
   },
-  // NEW: deep diagnostics so we see exactly which handler/path breaks
   diag: () => {
-    const out = {};
     try {
-      // try each handler individually to narrow the fault
-      out.priceHandler = (() => {
-        try {
-          const ph = require('../core/handlers/priceHandler');
-          return {
-            ok: true,
-            exports: Object.keys(ph || {}),
+      const core = require('../core');
+      const faqH = require('../core/handlers/faqHandler');
+      const priceH = require('../core/handlers/priceHandler');
+      const compH = require('../core/handlers/companyHandler');
+      return {
+        ok: true,
+        out: {
+          priceHandler: {
+            ok: !!priceH,
+            exports: Object.keys(priceH || {}),
             types: {
-              detectPriceIntent: typeof ph.detectPriceIntent,
-              handlePriceIntent: typeof ph.handlePriceIntent
+              detectPriceIntent: typeof priceH.detectPriceIntent,
+              handlePriceIntent: typeof priceH.handlePriceIntent
             }
-          };
-        } catch (e) {
-          return { ok: false, error: String(e && e.stack ? e.stack : e) };
+          },
+          faqHandler: {
+            ok: !!faqH,
+            exports: Object.keys(faqH || {})
+          },
+          companyHandler: {
+            ok: !!compH,
+            exports: Object.keys(compH || {})
+          },
+          coreIndex: {
+            ok: !!core,
+            exports: Object.keys(core || {})
+          },
+          coreLoadError: null
         }
-      })();
-
-      out.faqHandler = (() => {
-        try {
-          const fh = require('../core/handlers/faqHandler');
-          return { ok: true, exports: Object.keys(fh || {}) };
-        } catch (e) {
-          return { ok: false, error: String(e && e.stack ? e.stack : e) };
-        }
-      })();
-
-      out.companyHandler = (() => {
-        try {
-          const ch = require('../core/handlers/companyHandler');
-          return { ok: true, exports: Object.keys(ch || {}) };
-        } catch (e) {
-          return { ok: false, error: String(e && e.stack ? e.stack : e) };
-        }
-      })();
-
-      out.coreIndex = (() => {
-        try {
-          const core = require('../core');
-          return { ok: true, exports: Object.keys(core || {}) };
-        } catch (e) {
-          return { ok: false, error: String(e && e.stack ? e.stack : e) };
-        }
-      })();
-
-      // include last core load error (from lazy init)
-      out.coreLoadError = coreLoadError || null;
-
-      return { ok: true, out };
+      };
     } catch (e) {
-      return { ok: false, error: String(e && e.stack ? e.stack : e) };
+      return { ok: false, error: String(e?.message || e) };
     }
   }
 };
+
+// --- Cookie utils ---
+function parseCookies(req) {
+  const header = req.headers.cookie || '';
+  const out = {};
+  header.split(';').forEach(part => {
+    const [k, ...rest] = part.split('=');
+    if (!k) return;
+    const key = k.trim();
+    const val = decodeURIComponent((rest.join('=') || '').trim());
+    if (key) out[key] = val;
+  });
+  return out;
+}
+
+function setTopicCookie(res, topic) {
+  if (!topic) return;
+  // 15 minutter levetid
+  const maxAge = 15 * 60;
+  const cookie = `lm_topic=${encodeURIComponent(topic)}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
+  res.setHeader('Set-Cookie', cookie);
+}
 
 module.exports = async (req, res) => {
   try {
     setCors(req, res);
     if (req.method === 'OPTIONS') return res.status(204).end();
 
-    // GET = health/debug (?fn=env|version|which|knowledge|company|diag)
     if (req.method === 'GET') {
       const fn = (req.query && req.query.fn) || null;
       if (!fn) return res.status(200).json({ status: 'ok', time: new Date().toISOString() });
@@ -174,26 +170,32 @@ module.exports = async (req, res) => {
       try { body = JSON.parse(body); } catch { body = {}; }
     }
 
-    const text    = (body?.message || body?.text || '').trim();
-    const history = Array.isArray(body?.history) ? body.history : [];
-    const trace   = (req.query && (req.query.trace === '1' || req.query.trace === 'true')) || !!body?.trace;
+    const text  = (body?.message || body?.text || '').trim();
+    const trace = (req.query && (req.query.trace === '1' || req.query.trace === 'true')) || !!body?.trace;
 
     if (!text) return res.status(400).json({ error: 'Missing message' });
 
-    // Ensure core is loaded (and capture error if not)
-    const a = getAssistant();
-    if (!a) {
-      return res.status(500).json({
-        ok: false,
-        answer: 'Server error',
-        text: 'Server error',
-        error: coreLoadError || 'Unknown core load error'
-      });
-    }
+    // History fra klient (om den finnes)
+    const clientHistory = Array.isArray(body?.history) ? body.history : [];
 
-    const result = await a.handle({ text, history });
+    // Les forrige tema fra cookie og legg det inn som en «syntetisk» history-oppføring
+    const cookies = parseCookies(req);
+    const cookieTopic = (cookies.lm_topic || '').toLowerCase();
+    const cookieHistory = cookieTopic
+      ? [{ text: '', topic: cookieTopic, meta: { src: `cookie:${cookieTopic}` } }]
+      : [];
+
+    const allHistory = [...cookieHistory, ...clientHistory];
+
+    const result = await getAssistant().handle({ text, history: allHistory });
 
     if (result && typeof result.text === 'string') {
+      // Sett lm_topic-cookie når vi får et tydelig tema i meta
+      const topic = result?.meta?.topic;
+      if (topic && (topic === 'video' || topic === 'smalfilm' || topic === 'foto')) {
+        setTopicCookie(res, topic);
+      }
+
       let meta = result.meta || null;
       if (meta && !trace && meta.candidates) {
         const { candidates, ...rest } = meta;
