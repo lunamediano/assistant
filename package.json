@@ -7,12 +7,14 @@
     "dev:check": "node scripts/dev-check.js",
     "lint": "echo \"(valgfritt) legg til eslint senere\"",
     "format": "echo \"(valgfritt) legg til prettier senere\"",
-    "start": "node api/assist.js"
+    "start": "node api/assist.js",
+    "smoke": "node smoke.js"
   },
   "dependencies": {
     "fast-glob": "^3.3.2",
     "js-yaml": "^4.1.0",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "node-fetch": "^3.3.2"
   },
   "devDependencies": {}
 }
