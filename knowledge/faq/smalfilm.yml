@@ -11,7 +11,7 @@ faq:
       - "super8 til mp4"
     a: "Ja. Vi digitaliserer 8 mm/Super 8/16 mm (med/uten lyd) – skannet i 4K med WetGate-rens."
     tags: ["smalfilm","tjenester"]
-    boost: 2.0   # ✅ NYTT
+    boost: 2.0
 
   - id: smalfilm-tilbyr-digitalisering
     q: "Digitaliserer dere smalfilm (8 mm / Super 8 / 16 mm)?"
@@ -35,9 +35,9 @@ faq:
       Vi digitaliserer smalfilm (med og uten lyd) i beste 4K-format på vår avanserte MWA-skanner.
       Inkludert i prisen er WetGate-rens for best mulig resultat.
     tags: ["smalfilm", "super8", "8mm", "16mm", "tjenester"]
-    boost: 2.0   # ✅ NYTT
+    boost: 2.0
 
-      - id: smalfilm-formater
+  - id: smalfilm-formater
     q: "Hvilke smalfilmformater tar dere?"
     alt:
       - "hvilke formater tar dere"
@@ -59,7 +59,7 @@ faq:
       Filmene skannes i høy oppløsning (opptil 4K) med WetGate-rens for best resultat.
       Ta gjerne kontakt på telefon eller e-post for en vurdering av omfang og tilbud.
     tags: ["smalfilm", "super8", "8mm", "16mm", "formater"]
-    boost: 2.0   # ✅ NYTT
+    boost: 2.0
 
   - id: smalfilm-pris
     q: "Hva koster det å digitalisere smalfilm?"
@@ -94,7 +94,7 @@ faq:
       Vi gir rabatt ut fra omfang. Kontakt oss på telefon eller e-post, så kan vi gi et prisestimat/tilbud basert på anslått mengde.
       Usikker på mengden? Oppgi gjerne **diameter på rullene** (på selve filmrullen, ikke spolen/huben).
     tags: ["smalfilm", "pris"]
-    boost: 2.0   # ✅ NYTT
+    boost: 2.0
 
   - id: smalfilm-wetgate
     q: "Renser dere filmene (WetGate)?"
