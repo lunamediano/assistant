@@ -38,11 +38,14 @@ function createAssistant() {
       if (compIntent) {
         const r = handleCompanyIntent(compIntent, data.meta);
         if (r) {
-          return { ...r, meta: { ...(r.meta || {}), route: 'company', intent: compIntent } };
+          return {
+            ...r,
+            meta: { ...(r.meta || {}), route: 'company', intent: compIntent }
+          };
         }
       }
 
-      // 1) PRIS før FAQ (så pris alltid sendes til priskalkulator)
+      // 1) Pris før FAQ
       const priceIntent = detectPriceIntent(lower, { topicHint });
       if (priceIntent) {
         const r = handlePriceIntent(priceIntent, data.meta);
@@ -54,7 +57,7 @@ function createAssistant() {
         }
       }
 
-      // 2) FAQ – med topicHint-boost
+      // 2) FAQ
       const faqMatch = detectFaq(lower, data.faq, { topicHint });
       if (faqMatch) {
         const r = handleFaq(faqMatch);
@@ -64,7 +67,7 @@ function createAssistant() {
             ...(r.meta || {}),
             route: 'faq',
             id: faqMatch.id,
-            src: faqMatch._src || faqMatch.source,
+            src: faqMatch._src || faqMatch.source || faqMatch.src,
             topicHint: topicHint || null
           }
         };
