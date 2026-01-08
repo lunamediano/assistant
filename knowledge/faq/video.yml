@@ -2,6 +2,57 @@ version: 1
 faq:
   # --------------- VHS / VIDEO ---------------
 
+  - id: video-digitalisering
+    q: "Digitaliserer dere video (VHS, Video8/Hi8, MiniDV)?"
+    alt:
+      - "tar dere video"
+      - "tar dere video?"
+      - "tar dere videokassetter"
+      - "tar dere vhs"
+      - "vhs digitalisering"
+      - "digitaliserer dere video"
+      - "digitaliserer dere video?"
+      - "overføre video til fil"
+      - "overføre videokassetter"
+      - "vhs til mp4"
+      - "mini dv til mp4"
+      - "minidv til mp4"
+      - "video8 til mp4"
+      - "hi8 til mp4"
+      - "digital8 til mp4"
+      - "konvertere videokassetter"
+      - "gjøre om vhs til digitalt"
+    a: |
+      Ja. Vi digitaliserer VHS/VHS-C, Video8/Hi8, MiniDV m.fl.
+      Leveres som MP4 (USB/nedlasting), og på forespørsel kan vi levere ProRes/MOV.
+
+      For pris: bruk priskalkulatoren her: https://lunamedia.no/priskalkulator
+    tags: ["video", "video-digitalisering", "vhs", "vhs-c", "video8", "hi8", "minidv", "digital8", "tjenester"]
+
+  - id: video-produksjon
+    q: "Tilbyr dere videoopptak / videoproduksjon?"
+    alt:
+      - "kan dere filme"
+      - "videoopptak"
+      - "filming"
+      - "videoproduksjon"
+      - "produsere video"
+      - "profilfilm"
+      - "reklamefilm"
+      - "informasjonsvideo"
+      - "innholdsfilm"
+      - "dokumentarfilm"
+      - "intervju opptak"
+      - "event filming"
+      - "bryllup video"
+      - "konfirmasjon video"
+      - "filme et intervju"
+      - "trenger film til bedrift"
+    a: |
+      Ja – vi kan hjelpe med videoopptak og etterarbeid.
+      Ta kontakt, så avklarer vi ønsket uttrykk, varighet, opptakssted, lyd og levering – og gir et konkret forslag/tilbud.
+    tags: ["video", "video-produksjon", "opptak", "filming", "bedrift", "intervju", "event", "bryllup"]
+
   - id: vhs-pris
     q: "Hvor mye koster det å digitalisere en VHS-kassett?"
     alt:
@@ -24,33 +75,8 @@ faq:
       - "kostnad digitalisering av vhs"
       - "digitalisere videobånd"
     a: |
-      Kr 315,- per digitalisert time videoinnhold.
-      Vi gir mengderabatt: –10 % fra 10 timer, –20 % fra 20 timer.
-      Vennligst kontakt oss på telefon eller e-post, så vurderer vi omfanget og gir et prisestimat/tilbud.
+      For pris: bruk priskalkulatoren her: https://lunamedia.no/priskalkulator
     tags: ["vhs", "video", "pris", "rabatt"]
-
-    - id: video-produksjon
-  q: "Tilbyr dere videoopptak / videoproduksjon?"
-  alt:
-    - "kan dere filme"
-    - "videoopptak"
-    - "filming"
-    - "videoproduksjon"
-    - "produsere video"
-    - "profilfilm"
-    - "reklamefilm"
-    - "informasjonsvideo"
-    - "innholdsfilm"
-    - "dokumentarfilm"
-    - "intervju opptak"
-    - "event filming"
-    - "bryllup video"
-    - "konfirmasjon video"
-  a: |
-    Ja – vi kan hjelpe med videoopptak og etterarbeid.
-    Ta kontakt, så avklarer vi ønsket uttrykk, varighet, opptakssted, lyd og levering – og gir et konkret forslag/tilbud.
-  tags: ["video", "video-produksjon", "opptak", "filming", "bedrift", "intervju", "event", "bryllup"]
-
 
   - id: vhs-leveringstid
     q: "Hvor lang tid tar det å digitalisere videokassetter?"
@@ -65,35 +91,10 @@ faq:
       - "leveringstid videokassett"
       - "gjennomløpstid vhs"
       - "tid for digitalisering video"
-    a: >
+    a: |
       Normalt 4–14 dager, maks 3 uker.
       Kontakt oss gjerne på telefon eller e-post for en rask vurdering og mer presist tidsestimat.
-    tags: ["vhs", "leveringstid"]
-
-    - id: video-digitalisering
-  q: "Digitaliserer dere video (VHS, Video8/Hi8, MiniDV)?"
-  alt:
-    - "tar dere video"
-    - "tar dere video?"
-    - "tar dere videokassetter"
-    - "tar dere vhs"
-    - "vhs digitalisering"
-    - "digitaliserer dere video"
-    - "digitaliserer dere video?"
-    - "overføre video til fil"
-    - "overføre videokassetter"
-    - "vhs til mp4"
-    - "mini dv til mp4"
-    - "minidv til mp4"
-    - "video8 til mp4"
-    - "hi8 til mp4"
-    - "digital8 til mp4"
-  a: >
-    Ja. Vi digitaliserer VHS/VHS-C, Video8/Hi8, MiniDV m.fl.
-    Leveres som MP4 (USB/nedlasting), og på forespørsel kan vi levere ProRes/MOV.
-
-    For pris: bruk priskalkulatoren her: https://lunamedia.no/priskalkulator
-  tags: ["video", "video-digitalisering", "vhs", "video8", "hi8", "minidv", "digital8"]
+    tags: ["vhs", "video", "leveringstid"]
 
   - id: vhs-formater
     q: "Tar dere VHS-C, Video8/Hi8 og MiniDV?"
@@ -117,10 +118,11 @@ faq:
       - "8mm video til fil"
       - "digitalisere hi8 og minidv"
       - "digitalisering av camcorder-tape"
-    a: >
+    a: |
       Ja. Vi tar VHS/VHS-C, Video8/Hi8, MiniDV m.fl.
-      Ta kontakt på telefon eller e-post, så vurderer vi omfanget og gir et prisestimat/tilbud.
-    tags: ["vhs", "video", "formater", "vhs-c", "video8", "hi8", "minidv"]
+
+      For pris: bruk priskalkulatoren her: https://lunamedia.no/priskalkulator
+    tags: ["vhs", "video", "formater", "vhs-c", "video8", "hi8", "minidv", "digital8"]
 
   - id: vhs-kvalitetsforbedring
     q: "Kan dere forbedre kvaliteten på video?"
@@ -138,10 +140,9 @@ faq:
     a: |
       Ja. Vi justerer farger/kontrast, stabiliserer og reduserer skurr der det er mulig.
       Oppskalering til HD kan gjøres ved behov (med KI-verktøy), men vi bevarer alltid en tro kopi av originalen.
-      Kontakt oss gjerne på telefon eller e-post, så vurderer vi omfanget og kan gi prisestimat for både digitalisering og eventuell oppskalering.
-      
-    For pris: benytt gjerne også priskalkulatoren her: https://lunamedia.no/priskalkulator
-    tags: ["vhs", "kvalitet", "oppskalering"]
+
+      For pris: bruk priskalkulatoren her: https://lunamedia.no/priskalkulator
+    tags: ["vhs", "video", "kvalitet", "oppskalering"]
 
   - id: vhs-samle-pa-usb
     q: "Kan dere legge flere kassetter på én minnepenn?"
@@ -157,12 +158,11 @@ faq:
       - "samle alle vhs på usb"
       - "kan dere samle filene"
     a: |
-      Ja. Vi kan samle alle filer på én USB. Vi har minnepenner opptil 2 TB, som kan romme hundrevis av timer opptak.
+      Ja. Vi kan samle alle filer på én USB.
       Merk at mange TV-er krever FAT32 (MS-DOS), som har 4 GB filgrense – lange opptak deles da i flere filer.
-      Ta gjerne kontakt på telefon eller e-post for prisestimat, inkludert minnepenn.
-            
-    For pris: benytt gjerne også priskalkulatoren her: https://lunamedia.no/priskalkulator
-    tags: ["vhs", "leveranse", "usb", "fat32"]
+
+      For pris: bruk priskalkulatoren her: https://lunamedia.no/priskalkulator
+    tags: ["vhs", "video", "leveranse", "usb", "fat32"]
 
   - id: vhs-rydde-opptak
     q: "Hva gjør dere med skurr/blå skjerm og pauser?"
@@ -177,9 +177,9 @@ faq:
       - "blå skjerm fjernes"
       - "pauser kuttes"
       - "tar dere vekk ubrukelig opptak"
-    a: >
+    a: |
       Vi rydder opp og fjerner skurr, blå sekvenser og partier uten meningsfullt lyd- eller bildeinnhold.
-    tags: ["vhs", "redigering", "opprydding"]
+    tags: ["vhs", "video", "redigering", "opprydding"]
 
   - id: vhs-reparasjon
     q: "Reparerer dere kassetter?"
@@ -213,19 +213,8 @@ faq:
       - "v2000 format"
       - "s-vhs digitalisering"
       - "andre videobånd formater"
-    a: >
+    a: |
       Vi tar de vanligste formatene (VHS/VHS-C, Video8/Hi8, MiniDV m.fl.).
       Betamax og enkelte spesialformater kan vi løse etter vurdering.
       Send gjerne utfyllende info til kontakt@lunamedia.no – legg gjerne ved bilde av kassetten(e).
-    tags: ["vhs", "formater", "praktisk"]
-
-  - id: video-tilbyr
-    q: "Digitaliserer dere video?"
-    alt:
-      - "digitaliserer dere vhs"
-      - "digitaliserer dere videokassetter"
-      - "kan dere digitalisere video"
-      - "video til mp4"
-      - "overføre video til fil"
-    a: "Ja. Vi digitaliserer VHS/VHS-C, Video8/Hi8, MiniDV m.fl. – levert som MP4 (USB/nedlasting) eller på forespørsel ProRes/MOV."
-    tags: ["vhs", "video", "tjenester"]
+    tags: ["vhs", "video", "formater", "praktisk"]
