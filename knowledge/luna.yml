@@ -33,12 +33,6 @@ tjenester:
   - navn: 'Dias/foto til film med musikk og kommentarer'
     beskrivelse: 'Vi setter sammen flotte filmer av dine bilder med musikk, fortellerstemme og titler.'
 
-priser:
-  video_per_time: 'Kr 315,-'
-  minnepenn: 'Fra kr 295,-'
-  smalfilm_per_minutt: 'Fra kr 75,-'
-  scanning_foto_per_stk: 'Fra kr 10,-'
-
 levering:
   standard_dager: '7–14'
   rush_mulig: true
