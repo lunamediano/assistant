@@ -41,6 +41,8 @@ faq:
       - "reklamefilm"
       - "informasjonsvideo"
       - "innholdsfilm"
+      - "informasjonsfilm"
+      - "dokumentere"     
       - "dokumentarfilm"
       - "intervju opptak"
       - "event filming"
@@ -51,7 +53,7 @@ faq:
     a: |
       Ja – vi kan hjelpe med videoopptak og etterarbeid.
       Ta kontakt, så avklarer vi ønsket uttrykk, varighet, opptakssted, lyd og levering – og gir et konkret forslag/tilbud.
-    tags: ["video", "video-produksjon", "opptak", "filming", "bedrift", "intervju", "event", "bryllup"]
+    tags: ["video", "video-produksjon", "opptak", "filming", "bedrift", "intervju", "event", "bryllup", "dokumentasjon"]
 
   - id: vhs-pris
     q: "Hvor mye koster det å digitalisere en VHS-kassett?"
