@@ -29,6 +29,29 @@ faq:
       Vennligst kontakt oss på telefon eller e-post, så vurderer vi omfanget og gir et prisestimat/tilbud.
     tags: ["vhs", "video", "pris", "rabatt"]
 
+    - id: video-produksjon
+  q: "Tilbyr dere videoopptak / videoproduksjon?"
+  alt:
+    - "kan dere filme"
+    - "videoopptak"
+    - "filming"
+    - "videoproduksjon"
+    - "produsere video"
+    - "profilfilm"
+    - "reklamefilm"
+    - "informasjonsvideo"
+    - "innholdsfilm"
+    - "dokumentarfilm"
+    - "intervju opptak"
+    - "event filming"
+    - "bryllup video"
+    - "konfirmasjon video"
+  a: |
+    Ja – vi kan hjelpe med videoopptak og etterarbeid.
+    Ta kontakt, så avklarer vi ønsket uttrykk, varighet, opptakssted, lyd og levering – og gir et konkret forslag/tilbud.
+  tags: ["video", "video-produksjon", "opptak", "filming", "bedrift", "intervju", "event", "bryllup"]
+
+
   - id: vhs-leveringstid
     q: "Hvor lang tid tar det å digitalisere videokassetter?"
     alt:
