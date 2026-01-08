@@ -1,9 +1,5 @@
 version: 1
 faq:
-  # --------------- LEVERING / PRAKTISK ---------------
-
-  version: 1
-faq:
   # --------------- KONTAKT / SNAKKE MED MENNESKE ---------------
 
   - id: kontakt-menneske
