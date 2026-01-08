@@ -1,41 +1,35 @@
 // core/handlers/priceHandler.js
-// Pris: alltid henvis til priskalkulatoren (ingen kalkulasjon i chat)
 
-function detectPriceIntent(text) {
-  const t = (text || '').toLowerCase();
+function detectPriceIntent(text = '', opts = {}) {
+  const t = String(text || '').toLowerCase().trim();
+  if (!t) return null;
 
-  // Pris-/kostnadssignaler
+  // Fang både lange og korte pris-spørsmål, inkl. oppfølgere:
+  // "pris?", "og prisen?", "hva koster det", "kostnad", "hvor mye", etc.
   const isPrice =
-    /\b(hva\s*koster|pris|priser|kostnad|koster\s*det|hvor\s*mye|tilbud|prisoverslag|estim(at|at))\b/i.test(t);
+    /\b(hva\s*koster|hvor\s*mye|pris(en)?|kostnad|koster\s+det|pris\?)\b/i.test(t) ||
+    /^\s*(pris|prisen|og\s+pris(en)?|og\s+prisen)\s*\??\s*$/i.test(t);
 
   if (!isPrice) return null;
 
-  // Grov topic-detect (kun for meta/hint; svar er uansett priskalkulator)
-  let topic = null;
-  if (/\b(vhs|vhs-c|videokassett|videobånd|video8|hi8|minidv|digital8)\b/i.test(t)) topic = 'video';
-  else if (/\b(smalfilm|super\s*8|8mm|8\s*mm|16mm|16\s*mm)\b/i.test(t)) topic = 'smalfilm';
-  else if (/\b(foto|bilde|bilder|dias|lysbild|negativ)\b/i.test(t)) topic = 'foto';
+  // Valgfritt: ta med topicHint hvis du vil (ikke nødvendig når alt går til kalkulator)
+  const topicHint = (opts && opts.topicHint) ? String(opts.topicHint).toLowerCase() : null;
 
-  return { kind: 'price', topic };
+  return { kind: 'price', topicHint };
 }
 
-function handlePriceIntent(priceIntent, meta) {
-  if (!priceIntent) return null;
+function handlePriceIntent(intent, meta = {}) {
+  if (!intent) return null;
 
   const url = 'https://lunamedia.no/priskalkulator';
 
   return {
     type: 'answer',
-    text:
-      `For pris: bruk vår priskalkulator her:\n` +
-      `${url}\n\n` +
-      `Der får du raskt pris basert på type materiale og omfang.`,
+    text: `For pris: bruk priskalkulatoren her: ${url}`,
     meta: {
-      ...(meta || {}),
-      source: 'price-handler',
-      action: 'redirect',
+      source: 'priceHandler',
       url,
-      topic: priceIntent.topic || null
+      topic: intent.topicHint || null
     }
   };
 }
