@@ -9,13 +9,13 @@ function deriveTopicFromHistory(history = []) {
   const last = [...history].reverse().find(m => typeof m?.text === 'string' || typeof m?.content === 'string');
   if (!last) return null;
 
-  const topic = (last.topic || '').toLowerCase();
-  if (topic) return topic;
+  const t = (last.topic || '').toLowerCase();
+  if (t) return t;
 
-  const raw = (last.text || last.content || '').toLowerCase();
-  if (/vhs|videokassett|videobånd|videoband|video8|hi8|minidv|mini dv|digital8|video/.test(raw)) return 'video';
-  if (/smalfilm|super ?8|8mm|8 mm|16mm|16 mm/.test(raw)) return 'smalfilm';
-  if (/foto|bilde|bilder|dias|lysbild|negativ/.test(raw)) return 'foto';
+  const text = (last.text || last.content || '').toLowerCase();
+  if (/vhs|videokassett|videobånd|videoband|video8|hi8|minidv|mini dv|digital8|video/.test(text)) return 'video';
+  if (/smalfilm|super ?8|8mm|8 mm|16mm|16 mm/.test(text)) return 'smalfilm';
+  if (/foto|bilde|bilder|dias|negativ/.test(text)) return 'foto';
 
   const metaSrc = (last.meta && (last.meta.src || last.meta.source)) || '';
   if (/\/video\.yml/i.test(metaSrc)) return 'video';
@@ -33,20 +33,17 @@ function createAssistant() {
       const lower = (text || '').toLowerCase();
       const topicHint = deriveTopicFromHistory(history);
 
-      // 0) Company først (adresse, åpningstider, kontakt osv.)
+      // 0) Company først
       const compIntent = detectCompanyIntent(lower);
       if (compIntent) {
         const r = handleCompanyIntent(compIntent, data.meta);
         if (r) {
-          return {
-            ...r,
-            meta: { ...(r.meta || {}), route: 'company', intent: compIntent }
-          };
+          return { ...r, meta: { ...(r.meta || {}), route: 'company', intent: compIntent } };
         }
       }
 
-      // 1) PRIS ALLTID TIL PRISKALKULATOR (overstyrer FAQ)
-      const priceIntent = detectPriceIntent(lower);
+      // 1) PRIS før FAQ (så pris alltid sendes til priskalkulator)
+      const priceIntent = detectPriceIntent(lower, { topicHint });
       if (priceIntent) {
         const r = handlePriceIntent(priceIntent, data.meta);
         if (r) {
