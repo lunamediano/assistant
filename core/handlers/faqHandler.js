@@ -19,13 +19,17 @@ function anyContains(hay, list = []) {
 
 // Domenesignaler
 const K = {
-  video: /(vhs|videokassett|videobånd|videoband|video8|hi8|minidv|mini dv|digital8|video)\b/i,
+  // Digitalisering (forbruker/kassetter)
+  videoDigit: /\b(digitaliser|digitalisering|overfør|overfore|konverter|kopier|til\s*fil|til\s*mp4|usb|nedlasting|vhs|vhs-c|videokassett|videobånd|videoband|video8|hi8|minidv|mini\s*dv|digital8)\b/i,
+
+  // Produksjon (opptak/bedrift/event)
+  videoProd: /\b(film(e|ing)?|opptak|videoproduksjon|profilfilm|reklamefilm|informasjonsvideo|innholdsfilm|dokumentar|intervju|event|bryllup|konfirmasjon|bedrift|sosiale\s*medier)\b/i,
+
   smalfilm: /(smalfilm|super ?8|8mm|8 mm|16mm|16 mm)\b/i,
   foto: /(foto|bilde|bilder|dias|lysbild|negativ)\b/i,
   format: /\b(formater?|formatliste|støttede|stottede)\b/i
 };
 
-// Pris-signal (brukes for å sperre FAQ når dere vil sende alt til priskalkulator)
 function isPriceQuestion(t) {
   return /\b(hva\s*koster|hvor\s*mye|pris(en)?|kostnad|koster\s+det)\b/i.test(t || '');
 }
@@ -52,46 +56,71 @@ function scoreItem(userText, item, opts = {}) {
   const topicHint = opts.topicHint || null;
   if (topicHint && tags.includes(topicHint)) score += 25;
 
-  // 4) Aggressive domene-booster/dempere
+  // 4) Domene-booster/dempere
   const itemHayRaw = [q, ...(alts || []), ...(tags || [])].join(' ');
   const itemHay = itemHayRaw.toLowerCase();
 
-  const textVideo = K.video.test(t);
   const textSmal  = K.smalfilm.test(t);
   const textFoto  = K.foto.test(t);
   const textFmt   = K.format.test(t);
 
-  const itemVideo = /vhs|videokassett|videobånd|video8|hi8|minidv|digital8|video\b/i.test(itemHay);
+  const textVideoDigit = K.videoDigit.test(t);
+  const textVideoProd  = K.videoProd.test(t);
+
+  const itemVideoDigit =
+    /\b(video-digitalisering|digitaliser|overfør|vhs|videokassett|video8|hi8|minidv|digital8)\b/i.test(itemHay);
+
+  const itemVideoProd =
+    /\b(video-produksjon|videoproduksjon|profilfilm|reklamefilm|opptak|filming|intervju|event|bedrift|dokumentar)\b/i.test(itemHay);
+
   const itemSmal  = /smalfilm|super ?8|8mm|16 ?mm\b/i.test(itemHay);
-  const itemFoto  = /foto|bilde|dias|negativ\b/i.test(itemHay);
+  const itemFoto2 = /foto|bilde|dias|negativ\b/i.test(itemHay);
   const itemFmt   = /format|formater|formatliste|støttede|stottede\b/i.test(itemHay);
 
-  if (textVideo) {
-    if (itemVideo) score += 80;
-    if (itemSmal)  score -= 35;
+  // --- VIDEO: SPLITT digitalisering vs produksjon ---
+  // Hvis teksten tydelig handler om digitalisering:
+  if (textVideoDigit) {
+    if (itemVideoDigit) score += 110;
+    if (itemVideoProd)  score -= 60; // demp produksjon
   }
-  if (textSmal) {
-    if (itemSmal)  score += 80;
-    if (itemVideo) score -= 35;
-  }
-  if (textFoto && itemFoto) score += 60;
 
-  // 5) Pris-spørsmål (denne kan stå, men blir i praksis blokkert i detectFaq når dere vil sende alt til kalkulator)
+  // Hvis teksten tydelig handler om produksjon/opptak:
+  if (textVideoProd && !textVideoDigit) {
+    if (itemVideoProd)  score += 110;
+    if (itemVideoDigit) score -= 40;
+  }
+
+  // Hvis teksten bare sier "video" uten signaler, men topicHint finnes:
+  // (Lett dytt – ikke like aggressivt)
+  if (!textVideoDigit && !textVideoProd && topicHint === 'video') {
+    if (itemVideoDigit) score += 20;
+    if (itemVideoProd)  score += 10;
+  }
+
+  // --- SMALFILM/FOTO som før ---
+  if (textSmal) {
+    if (itemSmal) score += 80;
+  }
+  if (textFoto) {
+    if (itemFoto2) score += 60;
+  }
+
+  // 5) Pris-spørsmål: (FAQ kan fortsatt score, men i din løsning blir pris vanligvis håndtert før FAQ)
   const askingPrice = isPriceQuestion(t);
   if (askingPrice) {
     if (/pris|kostnad/.test(itemHay)) score += 15;
-    if (textVideo && itemVideo) score += 25;
-    if (textSmal && itemSmal)   score += 25;
-    if (textFoto && itemFoto)   score += 25;
+    if (textVideoDigit && itemVideoDigit) score += 25;
+    if (textSmal && itemSmal)             score += 25;
+    if (textFoto && itemFoto2)            score += 25;
   }
 
   // 6) Format-spørsmål
   if (textFmt) {
     if (itemFmt) score += 35;
-    if (!textVideo && !textSmal && !textFoto && topicHint) {
-      if (topicHint === 'video' && itemVideo) score += 30;
+    if (!textSmal && !textFoto && !textVideoDigit && !textVideoProd && topicHint) {
       if (topicHint === 'smalfilm' && itemSmal) score += 30;
-      if (topicHint === 'foto' && itemFoto) score += 30;
+      if (topicHint === 'foto' && itemFoto2) score += 30;
+      if (topicHint === 'video' && itemVideoDigit) score += 30; // format-spm om video er oftest digitalisering
     }
   }
 
@@ -101,8 +130,7 @@ function scoreItem(userText, item, opts = {}) {
 function detectFaq(userText, faqItems, opts = {}) {
   if (!userText || !faqItems || !faqItems.length) return null;
 
-  // ✅ HARD SPERRE:
-  // Hvis dette er et pris-spørsmål, skal FAQ ikke svare (dere vil sende alt til priskalkulator).
+  // Hvis dere fortsatt vil sende ALL pris til priskalkulator:
   if (isPriceQuestion(userText)) return null;
 
   let best = null;
