@@ -2,6 +2,79 @@ version: 1
 faq:
   # --------------- LEVERING / PRAKTISK ---------------
 
+  version: 1
+faq:
+  # --------------- KONTAKT / SNAKKE MED MENNESKE ---------------
+
+  - id: kontakt-menneske
+    q: "Kan jeg snakke med et menneske?"
+    alt:
+      - "kan jeg snakke med noen"
+      - "kan jeg snakke med en person"
+      - "kan jeg ringe dere"
+      - "jeg vil ringe"
+      - "jeg vil snakke med dere"
+      - "kundeservice"
+      - "support"
+      - "jeg trenger hjelp"
+      - "jeg vil i kontakt"
+      - "kan dere ringe meg"
+      - "vil heller snakke med en person"
+      - "er det mulig å snakke med et menneske"
+      - "hvem kan jeg kontakte"
+      - "hvem skal jeg kontakte"
+    a: |
+      Ja – selvfølgelig.
+      Du kan ringe oss på **33 74 02 80** eller sende e-post til **kontakt@lunamedia.no**.
+      Om du sender e-post; beskriv gjerne kort hva du ønsker å få utført, f.eks. digitalisering (video, smalfilm eller foto) og omtrent mengde, så hjelper vi deg raskt videre.
+    tags: ["kontakt", "menneske", "telefon", "epost", "praktisk"]
+    boost: 2.5
+
+  - id: kontakt-hvem
+    q: "Hvem kan jeg snakke med?"
+    alt:
+      - "hvem kan jeg kontakte"
+      - "hvem skal jeg kontakte"
+      - "hvem svarer"
+      - "hvem hjelper meg"
+      - "kan jeg få snakke med noen"
+      - "kontaktperson"
+    a: |
+      Du kan kontakte Luna Media direkte:
+      **Telefon:** 33 74 02 80  
+      **E-post:** kontakt@lunamedia.no
+    tags: ["kontakt", "telefon", "epost", "praktisk"]
+    boost: 2.2
+
+  - id: kontakt-telefon
+    q: "Hva er telefonnummeret deres?"
+    alt:
+      - "telefon"
+      - "telefonnummer"
+      - "tlf"
+      - "ring dere"
+      - "kan jeg ringe"
+      - "nummeret til luna media"
+      - "33 74 02 80"
+    a: |
+      Du når oss på **33 74 02 80**.
+    tags: ["kontakt", "telefon", "praktisk"]
+    boost: 2.0
+
+  - id: kontakt-epost
+    q: "Hva er e-postadressen deres?"
+    alt:
+      - "epost"
+      - "e-post"
+      - "mail"
+      - "send epost"
+      - "kontakt på epost"
+      - "kontakt@lunamedia.no"
+    a: |
+      Du kan skrive til oss på **kontakt@lunamedia.no**.
+    tags: ["kontakt", "epost", "praktisk"]
+    boost: 2.0
+
   - id: levering-hvor
     q: "Hvor kan jeg levere?"
     alt:
